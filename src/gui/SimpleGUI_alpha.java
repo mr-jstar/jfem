@@ -23,7 +23,7 @@ import sm.solvers.GMRES;
  *
  * @author jstar
  */
-public class SimpleGUI extends JFrame {
+public class SimpleGUI_alpha extends JFrame {
 
     private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
     private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
@@ -31,18 +31,15 @@ public class SimpleGUI extends JFrame {
 
     private final int vSize = 2;
 
-    private final int vertexSelectionRadius = 50;
+    private int vertexSelectionRadius = 20;
 
     private DrawingPanel drawingPanel;
 
     private IMesh mesh;
     private FEM model;
 
-    private boolean showMesh;
-    private boolean showField;
-    private boolean showVertexNo = true;
-    private boolean showSubDomains = true;
-
+    private boolean meshIsVisible;
+    private boolean fieldIsVisible;
     private boolean inDefBoundary = false;
     private final Set<Integer> currentVertexSelection = new TreeSet<>();
 
@@ -51,7 +48,8 @@ public class SimpleGUI extends JFrame {
 
     private final JButton loadButton;
     private final JButton meshButton;
-    private final JButton bndButton;
+    private final JButton bndButton;    private final String DEFAULT_BND_TEXT = "Add DBC(s)";
+    private final JButton rmBndButton;
     private final JButton computeButton;
     private final JButton fieldButton;
     private final JButton clearButton;
@@ -60,14 +58,7 @@ public class SimpleGUI extends JFrame {
 
     private final JLabel message;
 
-    private double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
-    private double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
-
-    private final Color[] subDomColors = {
-        Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY, Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY
-    };
-
-    public SimpleGUI() {
+    public SimpleGUI_alpha() {
         setTitle("Simple FEM GUI (Swing)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1600, 1200);
@@ -79,14 +70,15 @@ public class SimpleGUI extends JFrame {
         JPanel buttonPanel = new JPanel();
         loadButton = new JButton("Load mesh");
         meshButton = new JButton("Draw mesh");
-        bndButton = new JButton("Add boundary condition(s)");
+        bndButton = new JButton(DEFAULT_BND_TEXT);
+        rmBndButton = new JButton("Clear DBC(s)");
         computeButton = new JButton("Compute");
         fieldButton = new JButton("Draw field");
         clearButton = new JButton("Clear");
         saveButton = new JButton("Save figure");
         exitButton = new JButton("Close");
 
-        JButton[] buttons = {loadButton, meshButton, bndButton, computeButton, fieldButton, clearButton, saveButton, exitButton};
+        JButton[] buttons = {loadButton, meshButton, bndButton, rmBndButton, computeButton, fieldButton, clearButton, saveButton, exitButton};
 
         for (JButton btn : buttons) {
             btn.setFont(FONT18);
@@ -96,6 +88,7 @@ public class SimpleGUI extends JFrame {
         meshButton.addActionListener(e -> drawMesh());
         clearButton.addActionListener(e -> drawingPanel.clear());
         bndButton.addActionListener(e -> boundary());
+        rmBndButton.addActionListener(e -> clrBoundary());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
@@ -105,7 +98,8 @@ public class SimpleGUI extends JFrame {
             buttonPanel.add(btn);
         }
 
-        setJMenuBar(createMenuBar(buttons));
+        JMenuBar menuBar = createMenuBar(buttons, FONT18);
+        setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
 
@@ -121,12 +115,14 @@ public class SimpleGUI extends JFrame {
         setVisible(true);
     }
 
-    private JMenuBar createMenuBar(JButton[] btns) {
+    private JMenuBar createMenuBar(JButton[] btns, Font font) {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu("Menu");
+        menu.setFont(font);
 
         for (JButton b : btns) {
             JMenuItem nextItem = new JMenuItem(b.getText());
+            nextItem.setFont(font);
             for (ActionListener al : b.getActionListeners()) {
                 nextItem.addActionListener(al);
             }
@@ -152,14 +148,14 @@ public class SimpleGUI extends JFrame {
                     throw new IllegalArgumentException("Unknown mesh format: " + meshFile);
                 }
                 saveLastUsedDirectory(meshFile.getParent());
-                meshRange();
-                showMesh = false;
-                showField = false;
-                inDefBoundary = false;
+                meshIsVisible = false;
+                fieldIsVisible = false;
                 inDefBoundary = false;
                 currentVertexSelection.clear();
                 xy.clear();
                 bndNodes.clear();
+                bndButton.setText(DEFAULT_BND_TEXT);
+                bndButton.setForeground(Color.BLACK);
                 model = null;
                 drawingPanel.repaint();
                 JOptionPane.showMessageDialog(this, "Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
@@ -171,7 +167,7 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawMesh() {
-        showMesh = true;
+        meshIsVisible = true;
         drawingPanel.repaint();
     }
 
@@ -180,7 +176,7 @@ public class SimpleGUI extends JFrame {
             if (currentVertexSelection.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No nodes selected, try again.");
             } else {
-                bndButton.setText("Add boundary condition(s)");
+                bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
                 double value;
                 try {
@@ -193,6 +189,7 @@ public class SimpleGUI extends JFrame {
                         bndNodes.put(v, value);
                     }
                     inDefBoundary = false;
+                    currentVertexSelection.clear();
                     message.setText("");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
@@ -202,7 +199,7 @@ public class SimpleGUI extends JFrame {
             model = null;
             drawingPanel.repaint();
         } else {
-            if (showMesh) {
+            if (meshIsVisible) {
                 JOptionPane.showMessageDialog(this, "Click on the node to select it, "
                         + "click on selected to unselect,\n"
                         + "drag mouse to select/deselect all nodes in the rectangle\n"
@@ -215,6 +212,15 @@ public class SimpleGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Draw the mesh first!");
             }
         }
+    }
+
+    private void clrBoundary() {
+        bndNodes.clear();
+        currentVertexSelection.clear();
+        inDefBoundary = false;
+        bndButton.setText(DEFAULT_BND_TEXT);
+        bndButton.setForeground(Color.BLACK);
+        drawingPanel.repaint();
     }
 
     private void computeField() {
@@ -249,7 +255,7 @@ public class SimpleGUI extends JFrame {
                 computeButton.setEnabled(true);
                 loadButton.setEnabled(true);
                 long elapsedTime = System.nanoTime() - startTime;
-                JOptionPane.showMessageDialog(SimpleGUI.this, "Field computed in " + elapsedTime / 1000000 + " miliseconds");
+                JOptionPane.showMessageDialog(SimpleGUI_alpha.this, "Field computed in " + elapsedTime / 1000000 + " miliseconds");
             }
         };
         thread.setDaemon(true);
@@ -257,26 +263,6 @@ public class SimpleGUI extends JFrame {
         //double[] V = model.getFld();
         //double[] minmax = range(V);
         //System.out.println("V in <" + minmax[0] + "," + minmax[1] + ">");
-    }
-
-    private void meshRange() {
-        for (int v = 0; v < mesh.getNoVertices(); v++) {
-            double[] x = mesh.getVertex(v).getX();
-            if (x[0] < xrange[0]) {
-                xrange[0] = x[0];
-            }
-            if (x[0] > xrange[1]) {
-                xrange[1] = x[0];
-            }
-            if (x[1] < yrange[0]) {
-                yrange[0] = x[1];
-            }
-            if (x[1] > yrange[1]) {
-                yrange[1] = x[1];
-            }
-        }
-        xrange[1] -= xrange[0];
-        yrange[1] -= yrange[0];
     }
 
     private static double[] range(double[] v) {
@@ -293,8 +279,12 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawField() {
-        showField = true;
-        drawingPanel.repaint();
+        if (model != null && model.getFld() != null) {
+            fieldIsVisible = true;
+            drawingPanel.repaint();
+        } else {
+            JOptionPane.showMessageDialog(SimpleGUI_alpha.this, "Field NOT yet computed!");
+        }
     }
 
     private void setFontRecursively(Component comp, Font font) {
@@ -341,7 +331,7 @@ public class SimpleGUI extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(SimpleGUI::new);
+        SwingUtilities.invokeLater(SimpleGUI_alpha::new);
     }
 
     // Panel do rysowania
@@ -350,6 +340,7 @@ public class SimpleGUI extends JFrame {
         private Graphics g;
         private int prevX, prevY;
         private int currX, currY;
+        private boolean pressed;
 
         public DrawingPanel() {
             setDoubleBuffered(false);
@@ -390,7 +381,6 @@ public class SimpleGUI extends JFrame {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g;
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, getWidth(), getHeight());
 
@@ -416,10 +406,31 @@ public class SimpleGUI extends JFrame {
                 prevY = currY;
             }
 
-            if (showMesh) {
+            if (meshIsVisible) {
                 if (mesh == null || mesh.getDim() != 2) {
                     return;
                 }
+
+                double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
+                double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
+
+                for (int v = 0; v < mesh.getNoVertices(); v++) {
+                    double[] x = mesh.getVertex(v).getX();
+                    if (x[0] < xrange[0]) {
+                        xrange[0] = x[0];
+                    }
+                    if (x[0] > xrange[1]) {
+                        xrange[1] = x[0];
+                    }
+                    if (x[1] < yrange[0]) {
+                        yrange[0] = x[1];
+                    }
+                    if (x[1] > yrange[1]) {
+                        yrange[1] = x[1];
+                    }
+                }
+                xrange[1] -= xrange[0];
+                yrange[1] -= yrange[0];
 
                 double margin = 0.05;
                 double xbase = margin * getWidth();
@@ -428,52 +439,34 @@ public class SimpleGUI extends JFrame {
                 double height = getHeight() * (1 - 2 * margin);
 
                 xy.clear();
+                g.setColor(Color.BLUE);
+                g.setFont(FONT18);
                 for (int v = 0; v < mesh.getNoVertices(); v++) {
                     double[] x = mesh.getVertex(v).getX();
                     int ix = (int) Math.round(xbase + (x[0] - xrange[0]) / xrange[1] * width);
                     int iy = (int) Math.round(ybase + (1.0 - (x[1] - yrange[0]) / yrange[1]) * height);
+                    g.fillOval(ix - vSize / 2, iy - vSize / 2, vSize, vSize);
+                    if (mesh.getNoVertices() < 100) {
+                        if (currentVertexSelection.contains(v)) {
+                            g.setColor(Color.RED);
+                            g.drawString(String.valueOf(v), ix, iy);
+                            g.setColor(Color.BLUE);
+                        } else {
+                            g.drawString(String.valueOf(v), ix, iy);
+                        }
+                    }
                     xy.add(new PointPosition(ix, iy));
                 }
 
-                int[] ev = new int[mesh.getElem(0).getVertices().length + 1];
-                int[] evX = new int[mesh.getElem(0).getVertices().length];
-                int[] evY = new int[evX.length];
-                if (showSubDomains) {
-                    for (int e = 0; e < mesh.getNoElems(); e++) {
-                        System.arraycopy(mesh.getElem(e).getVertices(), 0, ev, 0, ev.length - 1);
-                        g2.setColor(subDomColors[mesh.getElem(e).getSubdomain()]);
-                        for (int i = 0; i < ev.length - 1; i++) {
-                            PointPosition p = xy.get(ev[i]);
-                            evX[i] = p.x;
-                            evY[i] = p.y;
-                        }
-                        g2.fillPolygon(evX, evY, evX.length);
-                    }
-                }
+                g.setColor(Color.GREEN);
+                int[] v = new int[mesh.getElem(0).getVertices().length + 1];
                 for (int e = 0; e < mesh.getNoElems(); e++) {
-                    System.arraycopy(mesh.getElem(e).getVertices(), 0, ev, 0, ev.length - 1);
-                    ev[ev.length - 1] = ev[0];
-                    g.setColor(Color.GREEN);
-                    for (int i = 1; i < ev.length; i++) {
-                        PointPosition p1 = xy.get(ev[i - 1]);
-                        PointPosition p2 = xy.get(ev[i]);
+                    System.arraycopy(mesh.getElem(e).getVertices(), 0, v, 0, v.length - 1);
+                    v[v.length - 1] = v[0];
+                    for (int i = 1; i < v.length; i++) {
+                        PointPosition p1 = xy.get(v[i - 1]);
+                        PointPosition p2 = xy.get(v[i]);
                         g.drawLine(p1.x, p1.y, p2.x, p2.y);
-                    }
-                }
-
-                g.setColor(Color.BLUE);
-                g.setFont(FONT18);
-                for (int v = 0; v < mesh.getNoVertices(); v++) {
-                    PointPosition p = xy.get(v);
-                    g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
-                    if (showVertexNo) {
-                        if (currentVertexSelection.contains(v)) {
-                            g.setColor(Color.RED);
-                            g.drawString(String.valueOf(v), p.x, p.y);
-                            g.setColor(Color.BLUE);
-                        } else {
-                            g.drawString(String.valueOf(v), p.x, p.y);
-                        }
                     }
                 }
 
@@ -484,7 +477,7 @@ public class SimpleGUI extends JFrame {
                     g.drawString(String.valueOf(bndNodes.get(b)), p.x, p.y + dh);
                 }
             }
-            if (showField) {
+            if (fieldIsVisible) {
                 if (model != null) {
                     double[] fld = model.getFld();
                     if (fld != null) {
@@ -570,8 +563,8 @@ public class SimpleGUI extends JFrame {
         }
 
         public void clear() {
-            showMesh = false;
-            showField = false;
+            meshIsVisible = false;
+            fieldIsVisible = false;
             repaint();
         }
 
