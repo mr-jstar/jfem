@@ -48,7 +48,8 @@ public class SimpleGUI extends JFrame {
 
     private final JButton loadButton;
     private final JButton meshButton;
-    private final JButton bndButton;
+    private final JButton bndButton;    private final String DEFAULT_BND_TEXT = "Add DBC(s)";
+    private final JButton rmBndButton;
     private final JButton computeButton;
     private final JButton fieldButton;
     private final JButton clearButton;
@@ -69,14 +70,15 @@ public class SimpleGUI extends JFrame {
         JPanel buttonPanel = new JPanel();
         loadButton = new JButton("Load mesh");
         meshButton = new JButton("Draw mesh");
-        bndButton = new JButton("Add boundary condition(s)");
+        bndButton = new JButton(DEFAULT_BND_TEXT);
+        rmBndButton = new JButton("Clear DBC(s)");
         computeButton = new JButton("Compute");
         fieldButton = new JButton("Draw field");
         clearButton = new JButton("Clear");
         saveButton = new JButton("Save figure");
         exitButton = new JButton("Close");
 
-        JButton[] buttons = {loadButton, meshButton, bndButton, computeButton, fieldButton, clearButton, saveButton, exitButton};
+        JButton[] buttons = {loadButton, meshButton, bndButton, rmBndButton, computeButton, fieldButton, clearButton, saveButton, exitButton};
 
         for (JButton btn : buttons) {
             btn.setFont(FONT18);
@@ -86,6 +88,7 @@ public class SimpleGUI extends JFrame {
         meshButton.addActionListener(e -> drawMesh());
         clearButton.addActionListener(e -> drawingPanel.clear());
         bndButton.addActionListener(e -> boundary());
+        rmBndButton.addActionListener(e -> clrBoundary());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
@@ -95,7 +98,8 @@ public class SimpleGUI extends JFrame {
             buttonPanel.add(btn);
         }
 
-        setJMenuBar(createMenuBar(buttons));
+        JMenuBar menuBar = createMenuBar(buttons, FONT18);
+        setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
 
@@ -111,12 +115,14 @@ public class SimpleGUI extends JFrame {
         setVisible(true);
     }
 
-    private JMenuBar createMenuBar(JButton[] btns) {
+    private JMenuBar createMenuBar(JButton[] btns, Font font) {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu("Menu");
+        menu.setFont(font);
 
         for (JButton b : btns) {
             JMenuItem nextItem = new JMenuItem(b.getText());
+            nextItem.setFont(font);
             for (ActionListener al : b.getActionListeners()) {
                 nextItem.addActionListener(al);
             }
@@ -148,7 +154,7 @@ public class SimpleGUI extends JFrame {
                 currentVertexSelection.clear();
                 xy.clear();
                 bndNodes.clear();
-                bndButton.setText("Add boundary condition(s)");
+                bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
                 model = null;
                 drawingPanel.repaint();
@@ -170,18 +176,20 @@ public class SimpleGUI extends JFrame {
             if (currentVertexSelection.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No nodes selected, try again.");
             } else {
-                bndButton.setText("Add boundary condition(s)");
+                bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
                 double value;
                 try {
                     String m = JOptionPane.showInputDialog("Value?");
-                    if( m == null )
+                    if (m == null) {
                         throw new NumberFormatException();
+                    }
                     value = Double.parseDouble(m);
                     for (Integer v : currentVertexSelection) {
                         bndNodes.put(v, value);
                     }
                     inDefBoundary = false;
+                    currentVertexSelection.clear();
                     message.setText("");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
@@ -192,10 +200,10 @@ public class SimpleGUI extends JFrame {
             drawingPanel.repaint();
         } else {
             if (meshIsVisible) {
-                JOptionPane.showMessageDialog(this, "Click on the node to select it, " +
-                        "click on selected to unselect,\n"+
-                        "drag mouse to select/deselect all nodes in the rectangle\n"+
-                        "when done click button again to be asked for the value.");
+                JOptionPane.showMessageDialog(this, "Click on the node to select it, "
+                        + "click on selected to unselect,\n"
+                        + "drag mouse to select/deselect all nodes in the rectangle\n"
+                        + "when done click button again to be asked for the value.");
                 inDefBoundary = true;
                 currentVertexSelection.clear();
                 bndButton.setForeground(Color.RED);
@@ -204,6 +212,15 @@ public class SimpleGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Draw the mesh first!");
             }
         }
+    }
+
+    private void clrBoundary() {
+        bndNodes.clear();
+        currentVertexSelection.clear();
+        inDefBoundary = false;
+        bndButton.setText(DEFAULT_BND_TEXT);
+        bndButton.setForeground(Color.BLACK);
+        drawingPanel.repaint();
     }
 
     private void computeField() {
@@ -262,11 +279,11 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawField() {
-        if( model != null && model.getFld() != null ) {
-        fieldIsVisible = true;
-        drawingPanel.repaint();
+        if (model != null && model.getFld() != null) {
+            fieldIsVisible = true;
+            drawingPanel.repaint();
         } else {
-            JOptionPane.showMessageDialog(SimpleGUI.this, "Field NOT yet computed!" );
+            JOptionPane.showMessageDialog(SimpleGUI.this, "Field NOT yet computed!");
         }
     }
 
@@ -367,7 +384,7 @@ public class SimpleGUI extends JFrame {
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, getWidth(), getHeight());
 
-            if (inDefBoundary && ( currX != prevX || currY != prevY) ) {
+            if (inDefBoundary && (currX != prevX || currY != prevY)) {
                 int xp = Math.min(currX, prevX);
                 int yp = Math.min(currY, prevY);
                 int width = Math.abs(currX - prevX);
@@ -430,7 +447,7 @@ public class SimpleGUI extends JFrame {
                     int iy = (int) Math.round(ybase + (1.0 - (x[1] - yrange[0]) / yrange[1]) * height);
                     g.fillOval(ix - vSize / 2, iy - vSize / 2, vSize, vSize);
                     if (mesh.getNoVertices() < 100) {
-                        if( currentVertexSelection.contains(v)) {
+                        if (currentVertexSelection.contains(v)) {
                             g.setColor(Color.RED);
                             g.drawString(String.valueOf(v), ix, iy);
                             g.setColor(Color.BLUE);
