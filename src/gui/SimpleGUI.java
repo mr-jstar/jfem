@@ -14,6 +14,8 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -38,12 +40,8 @@ public class SimpleGUI extends JFrame {
     private IMesh mesh;
     private FEM model;
 
-    private boolean showMesh;
-    private boolean showField;
-    private boolean showVertexNo = true;
-    private boolean showSubDomains = true;
+    private final Map<String, Boolean> optsMap = new HashMap<>();
 
-    private boolean inDefBoundary = false;
     private final Set<Integer> currentVertexSelection = new TreeSet<>();
 
     private final ArrayList<PointPosition> xy = new ArrayList<>();
@@ -110,6 +108,13 @@ public class SimpleGUI extends JFrame {
         }
 
         JMenuBar menuBar = createMenuBar(buttons, FONT18);
+
+        optsMap.put("showMesh", false);
+        optsMap.put("showField", false);
+        optsMap.put("showVertexNo", true);
+        optsMap.put("showSubDomains", true);
+        optsMap.put("inDefBoundary", false);
+        menuBar.add(options(optsMap, FONT18));
         setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
@@ -124,6 +129,26 @@ public class SimpleGUI extends JFrame {
         add(messagePanel, BorderLayout.SOUTH);
 
         setVisible(true);
+    }
+
+    private JMenu options(Map<String, Boolean> optsMap, Font font) {
+        JMenu opts = new JMenu("Options");
+        opts.setFont(font);
+
+        for (String s : optsMap.keySet()) {
+            JCheckBoxMenuItem nextOpt = new JCheckBoxMenuItem(s, optsMap.get(s));
+            nextOpt.setFont(font);
+
+            final String key = s;
+
+            nextOpt.addActionListener(e -> {
+                optsMap.put(key, nextOpt.getState());
+            });
+
+            opts.add(nextOpt);
+        }
+
+        return opts;
     }
 
     private JMenuBar createMenuBar(JButton[] btns, Font font) {
@@ -141,6 +166,7 @@ public class SimpleGUI extends JFrame {
         }
 
         menuBar.add(menu);
+
         return menuBar;
     }
 
@@ -160,10 +186,10 @@ public class SimpleGUI extends JFrame {
                 }
                 saveLastUsedDirectory(meshFile.getParent());
                 meshRange();
-                showMesh = false;
-                showField = false;
-                inDefBoundary = false;
-                inDefBoundary = false;
+                optsMap.put("showMesh", false);
+                optsMap.put("showField", false);
+                optsMap.put("inDefBoundary", false);
+                optsMap.put("inDefBoundary", false);
                 currentVertexSelection.clear();
                 xy.clear();
                 bndNodes.clear();
@@ -178,12 +204,12 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawMesh() {
-        showMesh = true;
+        optsMap.put("showMesh", true);
         drawingPanel.repaint();
     }
 
     private void boundary() {
-        if (inDefBoundary) {
+        if (optsMap.get("inDefBoundary")) {
             if (currentVertexSelection.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No nodes selected, try again.");
             } else {
@@ -199,7 +225,7 @@ public class SimpleGUI extends JFrame {
                     for (Integer v : currentVertexSelection) {
                         bndNodes.put(v, value);
                     }
-                    inDefBoundary = false;
+                    optsMap.put("inDefBoundary", false);
                     message.setText("");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
@@ -209,12 +235,12 @@ public class SimpleGUI extends JFrame {
             model = null;
             drawingPanel.repaint();
         } else {
-            if (showMesh) {
+            if (optsMap.get("showMesh")) {
                 JOptionPane.showMessageDialog(this, "Click on the node to select it, "
                         + "click on selected to unselect,\n"
                         + "drag mouse to select/deselect all nodes in the rectangle\n"
                         + "when done click button again to be asked for the value.");
-                inDefBoundary = true;
+                optsMap.put("inDefBoundary", true);
                 currentVertexSelection.clear();
                 bndButton.setForeground(Color.RED);
                 bndButton.setText("Click to finish selection");
@@ -227,7 +253,7 @@ public class SimpleGUI extends JFrame {
     private void clrBoundary() {
         bndNodes.clear();
         currentVertexSelection.clear();
-        inDefBoundary = false;
+        optsMap.put("inDefBoundary", false);
         bndButton.setText(DEFAULT_BND_TEXT);
         bndButton.setForeground(Color.BLACK);
         drawingPanel.repaint();
@@ -309,7 +335,7 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawField() {
-        showField = true;
+        optsMap.put("showField", true);
         drawingPanel.repaint();
     }
 
@@ -374,7 +400,7 @@ public class SimpleGUI extends JFrame {
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    if (inDefBoundary) {
+                    if (optsMap.get("inDefBoundary")) {
                         int nearestVertex = findNearestVertex(prevX, prevY);
                         if (nearestVertex >= 0) {
                             System.err.println(prevX + " " + prevY + " => " + nearestVertex);
@@ -410,7 +436,7 @@ public class SimpleGUI extends JFrame {
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, getWidth(), getHeight());
 
-            if (inDefBoundary && (currX != prevX || currY != prevY)) {
+            if (optsMap.get("inDefBoundary") && (currX != prevX || currY != prevY)) {
                 int xp = Math.min(currX, prevX);
                 int yp = Math.min(currY, prevY);
                 int width = Math.abs(currX - prevX);
@@ -432,7 +458,7 @@ public class SimpleGUI extends JFrame {
                 prevY = currY;
             }
 
-            if (showMesh) {
+            if (optsMap.get("showMesh")) {
                 if (mesh == null || mesh.getDim() != 2) {
                     return;
                 }
@@ -454,7 +480,7 @@ public class SimpleGUI extends JFrame {
                 int[] ev = new int[mesh.getElem(0).getVertices().length + 1];
                 int[] evX = new int[mesh.getElem(0).getVertices().length];
                 int[] evY = new int[evX.length];
-                if (showSubDomains) {
+                if (optsMap.get("showSubDomains")) {
                     for (int e = 0; e < mesh.getNoElems(); e++) {
                         System.arraycopy(mesh.getElem(e).getVertices(), 0, ev, 0, ev.length - 1);
                         g2.setColor(subDomColors[mesh.getElem(e).getSubdomain()]);
@@ -482,7 +508,7 @@ public class SimpleGUI extends JFrame {
                 for (int v = 0; v < mesh.getNoVertices(); v++) {
                     PointPosition p = xy.get(v);
                     g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
-                    if (showVertexNo) {
+                    if (optsMap.get("showVertexNo")) {
                         if (currentVertexSelection.contains(v)) {
                             g.setColor(Color.RED);
                             g.drawString(String.valueOf(v), p.x, p.y);
@@ -500,7 +526,7 @@ public class SimpleGUI extends JFrame {
                     g.drawString(String.valueOf(bndNodes.get(b)), p.x, p.y + dh);
                 }
             }
-            if (showField) {
+            if (optsMap.get("showField")) {
                 if (model != null) {
                     double[] fld = model.getFld();
                     if (fld != null) {
@@ -586,8 +612,8 @@ public class SimpleGUI extends JFrame {
         }
 
         public void clear() {
-            showMesh = false;
-            showField = false;
+            optsMap.put("showMesh", false);
+            optsMap.put("showField", false);
             repaint();
         }
 
