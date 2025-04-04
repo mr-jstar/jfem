@@ -145,8 +145,11 @@ public class SimpleGUI extends JFrame {
                 meshIsVisible = false;
                 fieldIsVisible = false;
                 inDefBoundary = false;
+                currentVertexSelection.clear();
                 xy.clear();
                 bndNodes.clear();
+                bndButton.setText("Add boundary condition(s)");
+                bndButton.setForeground(Color.BLACK);
                 model = null;
                 drawingPanel.repaint();
                 JOptionPane.showMessageDialog(this, "Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
@@ -259,8 +262,12 @@ public class SimpleGUI extends JFrame {
     }
 
     private void drawField() {
+        if( model != null && model.getFld() != null ) {
         fieldIsVisible = true;
         drawingPanel.repaint();
+        } else {
+            JOptionPane.showMessageDialog(SimpleGUI.this, "Field NOT yet computed!" );
+        }
     }
 
     private void setFontRecursively(Component comp, Font font) {
