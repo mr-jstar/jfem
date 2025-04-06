@@ -111,7 +111,7 @@ public class MatsTablePanel extends JPanel {
                 double value = Double.parseDouble(aValue.toString());
                 data.get(rowIndex)[columnIndex] = value;
             } catch (NumberFormatException e) {
-                JOptionPane.showMessageDialog(null, "Nieprawidłowa liczba: " + aValue);
+                JOptionPane.showMessageDialog(null, "Not a number: " + aValue);
             }
         }
     }
