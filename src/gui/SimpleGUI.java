@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import miscutils.MiscUtils;
 import sm.solvers.GMRES;
 
 /**
@@ -42,7 +43,7 @@ public class SimpleGUI extends JFrame {
     private FEM model;
 
     private final Map<String, Boolean> options = new HashMap<>();
-    private final Set<Integer> currentVertexSelection = new TreeSet<>();
+    private final Set<Integer> currentSelection = new TreeSet<>();
     private final ArrayList<PointPosition> xy = new ArrayList<>();
     private final TreeMap<Integer, Double> bndNodes = new TreeMap<>();
 
@@ -51,6 +52,8 @@ public class SimpleGUI extends JFrame {
     private final JButton bndButton;
     private final String DEFAULT_BND_TEXT = "Add DBC(s)";
     private final JButton rmBndButton;
+    private final JButton subDomButton;
+    private final String DEFAULT_SUB_TEXT = "Add/Change subdomains(s)";
     private final JButton matsButton;
     private final JButton computeButton;
     private final JButton fieldButton;
@@ -60,14 +63,14 @@ public class SimpleGUI extends JFrame {
 
     private final JLabel message;
 
-    private double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
-    private double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
+    private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
+    private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
 
     private final Color[] subDomColors = {
         Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY, Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY
     };
 
-    private double[][] subDomParameters;
+    private Map<Integer, double[]> subDomParameters = new HashMap<>(); // [0] - materials, [1] - sources
 
     public SimpleGUI() {
         setTitle("Simple FEM GUI (Swing)");
@@ -83,6 +86,7 @@ public class SimpleGUI extends JFrame {
         meshButton = new JButton("Draw mesh");
         bndButton = new JButton(DEFAULT_BND_TEXT);
         rmBndButton = new JButton("Clear DBC(s)");
+        subDomButton = new JButton(DEFAULT_SUB_TEXT);
         matsButton = new JButton("Edit materials");
         computeButton = new JButton("Compute");
         fieldButton = new JButton("Draw field");
@@ -92,7 +96,7 @@ public class SimpleGUI extends JFrame {
 
         JButton[] buttons = {
             loadButton, meshButton, bndButton, rmBndButton,
-            matsButton, computeButton, fieldButton,
+            subDomButton, matsButton, computeButton, fieldButton,
             clearButton, saveButton, exitButton
         };
 
@@ -105,7 +109,8 @@ public class SimpleGUI extends JFrame {
         clearButton.addActionListener(e -> drawingPanel.clear());
         bndButton.addActionListener(e -> boundary());
         rmBndButton.addActionListener(e -> clrBoundary());
-        matsButton.addActionListener(e -> subdomains());
+        subDomButton.addActionListener(e -> subdomains());
+        matsButton.addActionListener(e -> subDomainsParameters());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
@@ -122,12 +127,13 @@ public class SimpleGUI extends JFrame {
         options.put("showVertexNo", true);
         options.put("showSubDomains", true);
         options.put("inDefBoundary", false);
+        options.put("inDefSubdomain", false);
         menuBar.add(options(options, FONT18));
         setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
 
-        message = new JLabel();
+        message = new JLabel("OK");
         message.setFont(FONT18);
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
@@ -198,13 +204,13 @@ public class SimpleGUI extends JFrame {
                 options.put("showMesh", false);
                 options.put("showField", false);
                 options.put("inDefBoundary", false);
-                options.put("inDefBoundary", false);
-                currentVertexSelection.clear();
+                options.put("inDefSubdomains", false);
+                currentSelection.clear();
                 xy.clear();
                 bndNodes.clear();
                 model = null;
                 drawingPanel.repaint();
-                message.setText( "Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
+                message.setText("Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
             } catch (Exception e) {
                 mesh = null;
                 JOptionPane.showMessageDialog(this, "Unable to load mesh from: " + meshFile.getAbsolutePath());
@@ -218,11 +224,14 @@ public class SimpleGUI extends JFrame {
     }
 
     private void boundary() {
+        if (options.get("inDefSubdomain")) {
+            return;
+        }
         if (options.get("inDefBoundary")) {
-            if (currentVertexSelection.isEmpty()) {
+            if (currentSelection.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "No nodes selected, try again.");
             } else {
-                bndButton.setText("Add boundary condition(s)");
+                bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
                 double value;
                 try {
@@ -231,11 +240,11 @@ public class SimpleGUI extends JFrame {
                         throw new NumberFormatException();
                     }
                     value = Double.parseDouble(m);
-                    for (Integer v : currentVertexSelection) {
+                    for (Integer v : currentSelection) {
                         bndNodes.put(v, value);
                     }
                     options.put("inDefBoundary", false);
-                    message.setText("");
+                    message.setText("OK");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
                 }
@@ -250,7 +259,7 @@ public class SimpleGUI extends JFrame {
                         + "drag mouse to select/deselect all nodes in the rectangle\n"
                         + "when done click button again to be asked for the value.");
                 options.put("inDefBoundary", true);
-                currentVertexSelection.clear();
+                currentSelection.clear();
                 bndButton.setForeground(Color.RED);
                 bndButton.setText("Click to finish selection");
             } else {
@@ -261,7 +270,7 @@ public class SimpleGUI extends JFrame {
 
     private void clrBoundary() {
         bndNodes.clear();
-        currentVertexSelection.clear();
+        currentSelection.clear();
         options.put("inDefBoundary", false);
         bndButton.setText(DEFAULT_BND_TEXT);
         bndButton.setForeground(Color.BLACK);
@@ -269,21 +278,70 @@ public class SimpleGUI extends JFrame {
     }
 
     private void subdomains() {
-        if( mesh == null )
+        if (options.get("inDefBoundary")) {
             return;
+        }
+        if (options.get("inDefSubdomain")) {
+            if (currentSelection.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No elements selected, try again.");
+            } else {
+                subDomButton.setText(DEFAULT_SUB_TEXT);
+                subDomButton.setForeground(Color.BLACK);
+                int sbd;
+                try {
+                    String m = JOptionPane.showInputDialog("Subdomain #?");
+                    if (m == null) {
+                        throw new NumberFormatException();
+                    }
+                    sbd = Integer.parseInt(m);
+                    subDomParameters.computeIfAbsent(sbd, k -> new double[2]);
+                    for (Integer v : currentSelection) {
+                        mesh.getElem(v).setSubdomain(sbd);
+                    }
+                    System.err.println(MiscUtils.mapToString(subDomParameters));
+                    options.put("inDefSubdomain", false);
+                    message.setText("OK");
+                } catch (NumberFormatException e) {
+                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
+                }
+                System.err.println(bndNodes);
+            }
+            model = null;
+            drawingPanel.repaint();
+        } else {
+            if (options.get("showMesh")) {
+                JOptionPane.showMessageDialog(this, "Click on the element to select it, "
+                        + "click on selected to unselect,\n"
+                        + "drag mouse to select/deselect all elements in the rectangle\n"
+                        + "when done click button again to be asked for the subdomain.");
+                options.put("inDefSubdomain", true);
+                currentSelection.clear();
+                subDomButton.setForeground(Color.RED);
+                subDomButton.setText("Click to finish selection");
+            } else {
+                JOptionPane.showMessageDialog(this, "Draw the mesh first!");
+            }
+        }
+    }
+
+    private void subDomainsParameters() {
+        if (mesh == null) {
+            return;
+        }
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Subdomain(s) parameters");
             frame.setSize(300, 200);
             frame.setLocationRelativeTo(SimpleGUI.this);
 
-            String[] colN = {"Mats", "Srcs"};
+            String[] colN = {"SubDom", "Mats", "Srcs"};
 
-            MatsTablePanel panel = new MatsTablePanel(subDomParameters, colN);
+            MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN);
             frame.add(panel);
-            frame.addWindowListener(new WindowAdapter () {
+            frame.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosing(WindowEvent e) {
-                    subDomParameters = panel.getMatsArray();
+                    subDomParameters = panel.getData();
+                    System.err.println(MiscUtils.mapToString(subDomParameters));
                 }
             });
             frame.setVisible(true);
@@ -292,11 +350,7 @@ public class SimpleGUI extends JFrame {
 
     private void computeField() {
         EleIntegral integral = mesh.getElem(0).getVertices().length == 3 ? new TriangleLaplace() : new TetraLaplace();
-        double[] srcs = new double[mesh.getNoSubdomains() + 1];
-        double[] mats = new double[srcs.length];
-        for (int i = 0; i < srcs.length; i++) {
-            mats[i] = 1;
-        }
+
         int[] bndNds = new int[bndNodes.size()];
         double[] bndVals = new double[bndNds.length];
         int i = 0;
@@ -304,25 +358,30 @@ public class SimpleGUI extends JFrame {
             bndNds[i] = v;
             bndVals[i++] = bndNodes.get(v);
         }
-        model = new FEM(mesh, mats, srcs, bndNds, bndVals);
+        model = new FEM(mesh, subDomParameters, bndNds, bndVals);
         model.buildSymmetricMatrix(true);
         Thread thread = new Thread() {
             @Override
             public void run() {
-                long startTime = System.nanoTime();
-                fieldButton.setEnabled(false);
-                computeButton.setEnabled(false);
-                loadButton.setEnabled(false);
-                model.assemble(integral);
-                if (mesh.getNoVertices() < 10000) {
-                    model.dump("data/hr.m");
+                try {
+                    long startTime = System.nanoTime();
+                    fieldButton.setEnabled(false);
+                    computeButton.setEnabled(false);
+                    loadButton.setEnabled(false);
+                    model.assemble(integral);
+                    if (mesh.getNoVertices() < 10000) {
+                        model.dump("data/hr.m");
+                    }
+                    model.solve(new GMRES());
+                    fieldButton.setEnabled(true);
+                    computeButton.setEnabled(true);
+                    loadButton.setEnabled(true);
+                    long elapsedTime = System.nanoTime() - startTime;
+                    message.setText("Field computed in " + elapsedTime / 1000000 + " miliseconds");
+                } catch (Exception e) {
+                    message.setText("Field NOT computed: " + e.getLocalizedMessage());
                 }
-                model.solve(new GMRES());
-                fieldButton.setEnabled(true);
-                computeButton.setEnabled(true);
-                loadButton.setEnabled(true);
-                long elapsedTime = System.nanoTime() - startTime;
-                message.setText( "Field computed in " + elapsedTime / 1000000 + " miliseconds");
+
             }
         };
         thread.setDaemon(true);
@@ -355,20 +414,13 @@ public class SimpleGUI extends JFrame {
     }
 
     private void computeInitialSubdomains() {
-        Set<Integer> s = new TreeSet<>();
+        subDomParameters.clear();
         for (int e = 0; e < mesh.getNoElems(); e++) {
-            s.add(mesh.getElem(e).getSubdomain());
-        }
-        ArrayList<Integer> l = new ArrayList<>(s);
-        for (int e = 0; e < mesh.getNoElems(); e++) {
-            Elem el = mesh.getElem(e);
-            int idx = l.indexOf(el.getSubdomain());
-            el.setSubdomain(idx);
-        };
-        subDomParameters = new double[l.size()][2];
-        for (int i = 0; i < subDomParameters.length; i++) {
-            subDomParameters[i][0] = 1.0;
-            subDomParameters[i][1] = 0.0;
+            int s = mesh.getElem(e).getSubdomain();
+            if (!subDomParameters.containsKey(s)) {
+                double[] p = {1.0, 0.0};
+                subDomParameters.put(s, p);
+            }
         }
     }
 
@@ -454,12 +506,24 @@ public class SimpleGUI extends JFrame {
                         int nearestVertex = findNearestVertex(prevX, prevY);
                         if (nearestVertex >= 0) {
                             System.err.println(prevX + " " + prevY + " => " + nearestVertex);
-                            if (currentVertexSelection.contains(nearestVertex)) {
-                                currentVertexSelection.remove(nearestVertex);
+                            if (currentSelection.contains(nearestVertex)) {
+                                currentSelection.remove(nearestVertex);
                             } else {
-                                currentVertexSelection.add(nearestVertex);
+                                currentSelection.add(nearestVertex);
                             }
-                            message.setText("selected nodes: " + currentVertexSelection.toString());
+                            message.setText("selected nodes: " + currentSelection.toString());
+                        }
+                    }
+                    if (options.get("inDefSubdomain")) {
+                        int element = findClickedElement(prevX, prevY);
+                        if (element >= 0) {
+                            System.err.println(prevX + " " + prevY + " => Element" + element);
+                            if (currentSelection.contains(element)) {
+                                currentSelection.remove(element);
+                            } else {
+                                currentSelection.add(element);
+                            }
+                            message.setText("selected elements: " + currentSelection.toString());
                         }
                     }
                 }
@@ -472,6 +536,13 @@ public class SimpleGUI extends JFrame {
 
                 @Override
                 public void mouseReleased(MouseEvent e) {
+                    currX = e.getX();
+                    currY = e.getY();
+                    repaint();
+                }
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
                     currX = e.getX();
                     currY = e.getY();
                     repaint();
@@ -496,14 +567,43 @@ public class SimpleGUI extends JFrame {
                 for (int v = 0; v < xy.size(); v++) {
                     PointPosition p = xy.get(v);
                     if (p.x >= xp && p.x <= xp + width && p.y >= yp && p.y <= yp + height) {
-                        if (currentVertexSelection.contains(v)) {
-                            currentVertexSelection.remove(v);
+                        if (currentSelection.contains(v)) {
+                            currentSelection.remove(v);
                         } else {
-                            currentVertexSelection.add(v);
+                            currentSelection.add(v);
                         }
                     }
                 }
-                message.setText("selected nodes: " + currentVertexSelection.toString());
+                message.setText("selected nodes: " + currentSelection.toString());
+                prevX = currX;
+                prevY = currY;
+            }
+
+            if (options.get("inDefSubdomain") && (currX != prevX || currY != prevY)) {
+                int xp = Math.min(currX, prevX);
+                int yp = Math.min(currY, prevY);
+                int width = Math.abs(currX - prevX);
+                int height = Math.abs(currY - prevY);
+                g.setColor(Color.ORANGE);
+                g.drawRect(xp, yp, width, height);
+                for (int e = 0; e < mesh.getNoElems(); e++) {
+                    int[] ev = mesh.getElem(e).getVertices();
+                    int nin = 0;
+                    for (int v : ev) {
+                        PointPosition p = xy.get(v);
+                        if (p.x >= xp && p.x <= xp + width && p.y >= yp && p.y <= yp + height) {
+                            nin++;
+                        }
+                    }
+                    if (nin == ev.length) {
+                        if (currentSelection.contains(e)) {
+                            currentSelection.remove(e);
+                        } else {
+                            currentSelection.add(e);
+                        }
+                    }
+                }
+                message.setText("selected elements: " + currentSelection.toString());
                 prevX = currX;
                 prevY = currY;
             }
@@ -533,7 +633,11 @@ public class SimpleGUI extends JFrame {
                 if (options.get("showSubDomains")) {
                     for (int e = 0; e < mesh.getNoElems(); e++) {
                         System.arraycopy(mesh.getElem(e).getVertices(), 0, ev, 0, ev.length - 1);
-                        g2.setColor(subDomColors[mesh.getElem(e).getSubdomain()]);
+                        if (options.get("inDefSubdomain") && currentSelection.contains(e)) {
+                            g2.setColor(Color.WHITE);
+                        } else {
+                            g2.setColor(subDomColors[mesh.getElem(e).getSubdomain()]);
+                        }
                         for (int i = 0; i < ev.length - 1; i++) {
                             PointPosition p = xy.get(ev[i]);
                             evX[i] = p.x;
@@ -559,7 +663,7 @@ public class SimpleGUI extends JFrame {
                     PointPosition p = xy.get(v);
                     g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
                     if (options.get("showVertexNo")) {
-                        if (currentVertexSelection.contains(v)) {
+                        if (options.get("inDefBoundary") && currentSelection.contains(v)) {
                             g.setColor(Color.RED);
                             g.drawString(String.valueOf(v), p.x, p.y);
                             g.setColor(Color.BLUE);
@@ -603,11 +707,16 @@ public class SimpleGUI extends JFrame {
             }
         }
 
-        public void fillElem(Graphics g, int[] v, double[] fld, ColorMap cm) {
+        private PointPosition[] intCoordinatesForElem(int[] v) {
             PointPosition[] p = new PointPosition[v.length];
             for (int i = 0; i < v.length; i++) {
                 p[i] = xy.get(v[i]);
             }
+            return p;
+        }
+
+        public void fillElem(Graphics g, int[] v, double[] fld, ColorMap cm) {
+            PointPosition[] p = intCoordinatesForElem(v);
             int minX = Math.min(p[0].x, Math.min(p[1].x, p[2].x));
             int maxX = Math.max(p[0].x, Math.max(p[1].x, p[2].x));
             int minY = Math.min(p[0].y, Math.min(p[1].y, p[2].y));
@@ -625,6 +734,15 @@ public class SimpleGUI extends JFrame {
                     }
                 }
             }
+        }
+
+        private int findClickedElement(int x, int y) {
+            for (int e = 0; e < mesh.getNoElems(); e++) {
+                if (pointInTriangle(x, y, intCoordinatesForElem(mesh.getElem(e).getVertices()))) {
+                    return e;
+                }
+            }
+            return -1;
         }
 
         private boolean pointInTriangle(int x, int y, PointPosition[] p) {

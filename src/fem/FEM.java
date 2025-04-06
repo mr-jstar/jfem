@@ -4,6 +4,7 @@ import fem.mesh.Elem;
 import fem.mesh.IMesh;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.util.Map;
 import sm.CRS;
 import sm.solvers.*;
 
@@ -25,6 +26,23 @@ public class FEM {
 
     private CRS H;
     private double[] rhsv;
+    
+        public FEM(IMesh mesh, Map<Integer,double[]> params, int[] bndNodes, double[] bndValues) {
+        this.mesh = mesh;
+        this.bndNodes = bndNodes;
+        this.bndValues = bndValues;
+        int maxSubDomNo = -1;
+        for( Integer k : params.keySet() )
+            if( k > maxSubDomNo )
+                maxSubDomNo = k;
+        this.mats = new double[maxSubDomNo+1];
+        this.srcs = new double[maxSubDomNo+1];
+        for( Integer k : params.keySet() ) {
+            double [] kpar = params.get(k);
+            mats[k] = kpar[0];
+            srcs[k] = kpar[1];
+        }
+    }
 
     public FEM(IMesh mesh, double[] mats, double[] srcs, int[] bndNodes, double[] bndValues) {
         this.mesh = mesh;
