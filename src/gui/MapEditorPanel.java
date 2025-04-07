@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
 import java.util.*;
+import javax.swing.event.TableModelListener;
 /**
  *
  * @author jstar
@@ -13,12 +14,13 @@ public class MapEditorPanel extends JPanel {
     private final MapTableModel tableModel;
     private final JTable table;
 
-    public MapEditorPanel(Map<Integer, double[]> initialData, String [] colNames ) {
+    public MapEditorPanel(Map<Integer, Double[]> initialData, String [] colNames, Font headerFont ) {
         setLayout(new BorderLayout());
 
         tableModel = new MapTableModel(initialData, colNames);
         table = new JTable(tableModel);
         table.setFillsViewportHeight(true);
+        table.getTableHeader().setFont(headerFont);
 
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
@@ -46,6 +48,7 @@ public class MapEditorPanel extends JPanel {
         });
 
         JPanel buttonsPanel = new JPanel();
+        buttonsPanel.setBackground(Color.WHITE);
         buttonsPanel.add(addButton);
         buttonsPanel.add(removeButton);
         controlPanel.add(buttonsPanel, BorderLayout.NORTH);
@@ -55,19 +58,23 @@ public class MapEditorPanel extends JPanel {
         add(controlPanel, BorderLayout.SOUTH);
     }
 
-    public Map<Integer, double[]> getData() {
+    public Map<Integer, Double[]> getData() {
         return tableModel.toMap();
+    }
+    
+    public void addModelListener( TableModelListener listener ) {
+        tableModel.addTableModelListener(listener);
     }
 
     // Model tabeli
     private static class MapTableModel extends AbstractTableModel {
         private final java.util.List<Integer> keys = new ArrayList<>();
-        private final java.util.List<double[]> values = new ArrayList<>();
+        private final java.util.List<Double[]> values = new ArrayList<>();
         private final String [] colNames;
 
-        public MapTableModel(Map<Integer, double[]> initialData, String [] colNames) {
+        public MapTableModel(Map<Integer, Double[]> initialData, String [] colNames) {
             this.colNames = colNames;
-            for (Map.Entry<Integer, double[]> entry : initialData.entrySet()) {
+            for (Map.Entry<Integer, Double[]> entry : initialData.entrySet()) {
                 keys.add(entry.getKey());
                 values.add(entry.getValue());
             }
@@ -76,7 +83,7 @@ public class MapEditorPanel extends JPanel {
         public void addEntry() {
             int newKey = findNextFreeKey();
             keys.add(newKey);
-            values.add(new double[]{0.0, 0.0});
+            values.add(new Double[]{0.0, 0.0});
             fireTableRowsInserted(keys.size() - 1, keys.size() - 1);
         }
 
@@ -92,8 +99,8 @@ public class MapEditorPanel extends JPanel {
             return i;
         }
 
-        public Map<Integer, double[]> toMap() {
-            Map<Integer, double[]> map = new LinkedHashMap<>();
+        public Map<Integer, Double[]> toMap() {
+            Map<Integer, Double[]> map = new LinkedHashMap<>();
             for (int i = 0; i < keys.size(); i++) {
                 map.put(keys.get(i), values.get(i));
             }
@@ -145,6 +152,7 @@ public class MapEditorPanel extends JPanel {
                     case 1 -> values.get(rowIndex)[0] = Double.parseDouble(aValue.toString());
                     case 2 -> values.get(rowIndex)[1] = Double.parseDouble(aValue.toString());
                 }
+                fireTableCellUpdated(rowIndex, columnIndex);
             } catch (NumberFormatException e) {
                 JOptionPane.showMessageDialog(null, "Not a number: " + aValue);
             }

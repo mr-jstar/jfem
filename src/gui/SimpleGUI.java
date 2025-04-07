@@ -31,7 +31,7 @@ public class SimpleGUI extends JFrame {
     private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
     private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
     private static Font CURRENT_FONT = FONT18;
-    
+
     private static final String CONFIG_FILE = ".femconfig";
 
     private final int vSize = 2;
@@ -48,28 +48,35 @@ public class SimpleGUI extends JFrame {
     private final ArrayList<PointPosition> xy = new ArrayList<>();
     private final TreeMap<Integer, Double> bndNodes = new TreeMap<>();
 
-    private final JButton loadButton;
-    private final JButton meshButton;
-    private final JButton bndButton;
     private final String DEFAULT_BND_TEXT = "Add DBC(s)";
-    private final JButton rmBndButton;
-    private final JButton subDomButton;
-    private final String DEFAULT_SUB_TEXT = "Add/Change subdomains(s)";
-    private final JButton matsButton;
-    private final JButton computeButton;
-    private final JButton fieldButton;
-    private final JButton clearButton;
-    private final JButton saveButton;
-    private final JButton exitButton;
+    private final String DEFAULT_SUB_TEXT = "Modify subdomain(s)";
+
+    private final JButton loadButton = new JButton("Load mesh");
+    private final JButton meshButton = new JButton("Draw mesh");
+    private final JButton bndButton = new JButton(DEFAULT_BND_TEXT);
+    private final JButton rmBndButton = new JButton("Clear DBC(s)");
+    private final JButton subDomButton = new JButton(DEFAULT_SUB_TEXT);
+    private final JButton matsButton = new JButton("Edit materials");
+    private final JButton computeButton = new JButton("Compute");
+    private final JButton fieldButton = new JButton("Draw field");
+    private final JButton clearButton = new JButton("Clear");
+    private final JButton saveButton = new JButton("Save figure");
+    private final JButton exitButton = new JButton("Close");
+
+    private final JButton[] buttons = {
+        loadButton, meshButton, bndButton, rmBndButton,
+        subDomButton, matsButton, computeButton, fieldButton,
+        clearButton, saveButton, exitButton
+    };
 
     private final JLabel message;
 
     private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
     private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
 
-    private final Map<Integer,Color> subDomColors = new HashMap<>();
+    private final Map<Integer, Color> subDomColors = new HashMap<>();
 
-    private Map<Integer, double[]> subDomParameters = new HashMap<>(); // [0] - materials, [1] - sources
+    private Map<Integer, Double[]> subDomParameters = new HashMap<>(); // [0] - materials, [1] - sources
 
     public SimpleGUI() {
         setTitle("Simple FEM GUI (Swing)");
@@ -81,23 +88,6 @@ public class SimpleGUI extends JFrame {
         UIManager.put("OptionPane.buttonFont", CURRENT_FONT);
 
         JPanel buttonPanel = new JPanel();
-        loadButton = new JButton("Load mesh");
-        meshButton = new JButton("Draw mesh");
-        bndButton = new JButton(DEFAULT_BND_TEXT);
-        rmBndButton = new JButton("Clear DBC(s)");
-        subDomButton = new JButton(DEFAULT_SUB_TEXT);
-        matsButton = new JButton("Edit materials");
-        computeButton = new JButton("Compute");
-        fieldButton = new JButton("Draw field");
-        clearButton = new JButton("Clear");
-        saveButton = new JButton("Save figure");
-        exitButton = new JButton("Close");
-
-        JButton[] buttons = {
-            loadButton, meshButton, bndButton, rmBndButton,
-            subDomButton, matsButton, computeButton, fieldButton,
-            clearButton, saveButton, exitButton
-        };
 
         for (JButton btn : buttons) {
             btn.setFont(CURRENT_FONT);
@@ -108,7 +98,7 @@ public class SimpleGUI extends JFrame {
         clearButton.addActionListener(e -> drawingPanel.clear());
         bndButton.addActionListener(e -> modifyBoundary());
         rmBndButton.addActionListener(e -> clrBoundary());
-        subDomButton.addActionListener(e -> modiifySubdomains());
+        subDomButton.addActionListener(e -> modifySubdomains());
         matsButton.addActionListener(e -> subDomainsParameters());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
@@ -140,8 +130,18 @@ public class SimpleGUI extends JFrame {
         add(buttonPanel, BorderLayout.NORTH);
         add(drawingPanel, BorderLayout.CENTER);
         add(messagePanel, BorderLayout.SOUTH);
+        
+        switchAllButtons(false);
+        loadButton.setEnabled(true);
+        exitButton.setEnabled(true);
 
         setVisible(true);
+    }
+
+    private void switchAllButtons(boolean flag) {
+        for (JButton btn : buttons) {
+            btn.setEnabled(flag);
+        }
     }
 
     private JMenu options(Map<String, Boolean> optsMap, Font font) {
@@ -208,7 +208,9 @@ public class SimpleGUI extends JFrame {
                 xy.clear();
                 bndNodes.clear();
                 model = null;
+                fieldButton.setEnabled(false);
                 drawingPanel.repaint();
+                switchAllButtons(true);
                 message.setText("Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
             } catch (Exception e) {
                 mesh = null;
@@ -228,7 +230,7 @@ public class SimpleGUI extends JFrame {
         }
         if (options.get("inDefBoundary")) {
             if (currentSelection.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No nodes selected, try again.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE );
+                JOptionPane.showMessageDialog(this, "No nodes selected, try again.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
             } else {
                 bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
@@ -243,6 +245,7 @@ public class SimpleGUI extends JFrame {
                         bndNodes.put(v, value);
                     }
                     options.put("inDefBoundary", false);
+                    switchAllButtons(true);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
@@ -250,6 +253,7 @@ public class SimpleGUI extends JFrame {
                 System.err.println(bndNodes);
             }
             model = null;
+            fieldButton.setEnabled(false);
             drawingPanel.repaint();
         } else {
             if (options.get("showMesh")) {
@@ -259,6 +263,8 @@ public class SimpleGUI extends JFrame {
                         + "when done click button again to be asked for the value.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefBoundary", true);
                 currentSelection.clear();
+                switchAllButtons(false);
+                bndButton.setEnabled(true);
                 bndButton.setForeground(Color.RED);
                 bndButton.setText("Click to finish selection");
             } else {
@@ -268,15 +274,18 @@ public class SimpleGUI extends JFrame {
     }
 
     private void clrBoundary() {
+        model = null;
         bndNodes.clear();
         currentSelection.clear();
         options.put("inDefBoundary", false);
+        options.put("showField", false);
+        fieldButton.setEnabled(false);
         bndButton.setText(DEFAULT_BND_TEXT);
         bndButton.setForeground(Color.BLACK);
         drawingPanel.repaint();
     }
 
-    private void modiifySubdomains() {
+    private void modifySubdomains() {
         if (options.get("inDefBoundary")) {
             return;
         }
@@ -293,12 +302,16 @@ public class SimpleGUI extends JFrame {
                         throw new NumberFormatException();
                     }
                     sbd = Integer.parseInt(m);
-                    subDomParameters.computeIfAbsent(sbd, k -> new double[2]);
+                    if( ! subDomParameters.containsKey(sbd) ) {
+                        Double [] npar = { 1.0, 0.0 };
+                        subDomParameters.put( sbd, npar);
+                    }
                     for (Integer v : currentSelection) {
                         mesh.getElem(v).setSubdomain(sbd);
                     }
                     rebuildSubDomainColors();
                     System.err.println(MiscUtils.mapToString(subDomParameters));
+                    switchAllButtons(true);
                     options.put("inDefSubdomain", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
@@ -307,6 +320,8 @@ public class SimpleGUI extends JFrame {
                 System.err.println(bndNodes);
             }
             model = null;
+            options.put("showField",false);
+            fieldButton.setEnabled(false);
             drawingPanel.repaint();
         } else {
             if (options.get("showMesh")) {
@@ -316,6 +331,8 @@ public class SimpleGUI extends JFrame {
                         + "when done click button again to be asked for the subdomain.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefSubdomain", true);
                 currentSelection.clear();
+                switchAllButtons(false);
+                subDomButton.setEnabled(true);
                 subDomButton.setForeground(Color.RED);
                 subDomButton.setText("Click to finish selection");
             } else {
@@ -332,10 +349,17 @@ public class SimpleGUI extends JFrame {
             JFrame frame = new JFrame("Subdomain(s) parameters");
             frame.setSize(400, 200);
             frame.setLocationRelativeTo(SimpleGUI.this);
-            
+
             String[] colN = {"SubDom", "Materials", "Sources"};
 
-            MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN);
+            MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN, CURRENT_FONT);
+            
+            panel.addModelListener(e -> {
+                model = null;
+                options.put("showField",false);
+                fieldButton.setEnabled(false);
+                drawingPanel.repaint();
+            });
             frame.add(panel);
             frame.addWindowListener(new WindowAdapter() {
                 @Override
@@ -380,7 +404,10 @@ public class SimpleGUI extends JFrame {
                     long elapsedTime = System.nanoTime() - startTime;
                     message.setText("Field computed in " + elapsedTime / 1000000 + " miliseconds");
                 } catch (Exception e) {
-                    message.setText("Field NOT computed: " + e.getLocalizedMessage());
+                    message.setText("Field NOT computed, reason: " + e.getLocalizedMessage());
+                    model = null;
+                    fieldButton.setEnabled(false);
+                    options.put("showField", false);
                 }
 
             }
@@ -419,18 +446,18 @@ public class SimpleGUI extends JFrame {
         for (int e = 0; e < mesh.getNoElems(); e++) {
             int s = mesh.getElem(e).getSubdomain();
             if (!subDomParameters.containsKey(s)) {
-                double[] p = {1.0, 0.0};
+                Double[] p = {1.0, 0.0};
                 subDomParameters.put(s, p);
             }
         }
         rebuildSubDomainColors();
     }
-    
+
     private void rebuildSubDomainColors() {
         subDomColors.clear();
-        int c = 240, dc= 20;
-        for( Integer k : subDomParameters.keySet() ) {
-            subDomColors.put( k, new Color( c % 256 , c % 256, c %256 ));
+        int c = 240, dc = 20;
+        for (Integer k : subDomParameters.keySet()) {
+            subDomColors.put(k, new Color(c % 256, c % 256, c % 256));
             c -= dc;
         }
     }
@@ -567,7 +594,7 @@ public class SimpleGUI extends JFrame {
             Graphics2D g2 = (Graphics2D) g;
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, getWidth(), getHeight());
-            
+
             if (options.get("inDefBoundary") && (currX != prevX || currY != prevY)) {
                 int xp = Math.min(currX, prevX);
                 int yp = Math.min(currY, prevY);
@@ -647,7 +674,7 @@ public class SimpleGUI extends JFrame {
                         if (options.get("inDefSubdomain") && currentSelection.contains(e)) {
                             g2.setColor(Color.WHITE);
                         } else {
-                            g2.setColor(subDomColors.get(mesh.getElem(e).getSubdomain() ));
+                            g2.setColor(subDomColors.get(mesh.getElem(e).getSubdomain()));
                         }
                         for (int i = 0; i < ev.length - 1; i++) {
                             PointPosition p = xy.get(ev[i]);

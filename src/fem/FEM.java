@@ -27,7 +27,7 @@ public class FEM {
     private CRS H;
     private double[] rhsv;
     
-        public FEM(IMesh mesh, Map<Integer,double[]> params, int[] bndNodes, double[] bndValues) {
+        public FEM(IMesh mesh, Map<Integer,Double[]> params, int[] bndNodes, double[] bndValues) {
         this.mesh = mesh;
         this.bndNodes = bndNodes;
         this.bndValues = bndValues;
@@ -38,7 +38,7 @@ public class FEM {
         this.mats = new double[maxSubDomNo+1];
         this.srcs = new double[maxSubDomNo+1];
         for( Integer k : params.keySet() ) {
-            double [] kpar = params.get(k);
+            Double [] kpar = params.get(k);
             mats[k] = kpar[0];
             srcs[k] = kpar[1];
         }
