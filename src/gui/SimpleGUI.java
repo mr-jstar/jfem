@@ -107,9 +107,9 @@ public class SimpleGUI extends JFrame {
         loadButton.addActionListener(e -> loadFile());
         meshButton.addActionListener(e -> drawMesh());
         clearButton.addActionListener(e -> drawingPanel.clear());
-        bndButton.addActionListener(e -> boundary());
+        bndButton.addActionListener(e -> modifyBoundary());
         rmBndButton.addActionListener(e -> clrBoundary());
-        subDomButton.addActionListener(e -> subdomains());
+        subDomButton.addActionListener(e -> modiifySubdomains());
         matsButton.addActionListener(e -> subDomainsParameters());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
@@ -223,19 +223,19 @@ public class SimpleGUI extends JFrame {
         drawingPanel.repaint();
     }
 
-    private void boundary() {
+    private void modifyBoundary() {
         if (options.get("inDefSubdomain")) {
             return;
         }
         if (options.get("inDefBoundary")) {
             if (currentSelection.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No nodes selected, try again.");
+                JOptionPane.showMessageDialog(this, "No nodes selected, try again.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE );
             } else {
                 bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
                 double value;
                 try {
-                    String m = JOptionPane.showInputDialog("Value?");
+                    String m = JOptionPane.showInputDialog(this, "Value?", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                     if (m == null) {
                         throw new NumberFormatException();
                     }
@@ -246,7 +246,7 @@ public class SimpleGUI extends JFrame {
                     options.put("inDefBoundary", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
+                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 }
                 System.err.println(bndNodes);
             }
@@ -257,13 +257,13 @@ public class SimpleGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Click on the node to select it, "
                         + "click on selected to unselect,\n"
                         + "drag mouse to select/deselect all nodes in the rectangle\n"
-                        + "when done click button again to be asked for the value.");
+                        + "when done click button again to be asked for the value.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefBoundary", true);
                 currentSelection.clear();
                 bndButton.setForeground(Color.RED);
                 bndButton.setText("Click to finish selection");
             } else {
-                JOptionPane.showMessageDialog(this, "Draw the mesh first!");
+                JOptionPane.showMessageDialog(this, "Draw the mesh first!", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
             }
         }
     }
@@ -277,19 +277,19 @@ public class SimpleGUI extends JFrame {
         drawingPanel.repaint();
     }
 
-    private void subdomains() {
+    private void modiifySubdomains() {
         if (options.get("inDefBoundary")) {
             return;
         }
         if (options.get("inDefSubdomain")) {
             if (currentSelection.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No elements selected, try again.");
+                JOptionPane.showMessageDialog(this, "No elements selected, try again.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
             } else {
                 subDomButton.setText(DEFAULT_SUB_TEXT);
                 subDomButton.setForeground(Color.BLACK);
                 int sbd;
                 try {
-                    String m = JOptionPane.showInputDialog("Subdomain #?");
+                    String m = JOptionPane.showInputDialog(this, "Subdomain #?", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                     if (m == null) {
                         throw new NumberFormatException();
                     }
@@ -302,7 +302,7 @@ public class SimpleGUI extends JFrame {
                     options.put("inDefSubdomain", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.");
+                    JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                 }
                 System.err.println(bndNodes);
             }
@@ -313,13 +313,13 @@ public class SimpleGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Click on the element to select it, "
                         + "click on selected to unselect,\n"
                         + "drag mouse to select/deselect all elements in the rectangle\n"
-                        + "when done click button again to be asked for the subdomain.");
+                        + "when done click button again to be asked for the subdomain.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefSubdomain", true);
                 currentSelection.clear();
                 subDomButton.setForeground(Color.RED);
                 subDomButton.setText("Click to finish selection");
             } else {
-                JOptionPane.showMessageDialog(this, "Draw the mesh first!");
+                JOptionPane.showMessageDialog(this, "Draw the mesh first!", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
             }
         }
     }
@@ -333,13 +333,13 @@ public class SimpleGUI extends JFrame {
             frame.setSize(300, 200);
             frame.setLocationRelativeTo(SimpleGUI.this);
 
-            String[] colN = {"SubDom", "Mats", "Srcs"};
+            String[] colN = {"SubDom", "Materials", "Sources"};
 
             MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN);
             frame.add(panel);
             frame.addWindowListener(new WindowAdapter() {
                 @Override
-                public void windowClosing(WindowEvent e) {
+                public void windowClosed(WindowEvent e) {
                     subDomParameters = panel.getData();
                     System.err.println(MiscUtils.mapToString(subDomParameters));
                 }

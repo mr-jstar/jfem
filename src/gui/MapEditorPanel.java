@@ -23,9 +23,12 @@ public class MapEditorPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
 
-        JPanel buttonsPanel = new JPanel();
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new BorderLayout());
+        
         JButton addButton = new JButton("Add row");
         JButton removeButton = new JButton("Remove selected");
+        JButton closeButton = new JButton("Close");
 
         addButton.addActionListener(e -> tableModel.addEntry());
         removeButton.addActionListener(e -> {
@@ -34,10 +37,22 @@ public class MapEditorPanel extends JPanel {
                 tableModel.removeEntry(selected);
             }
         });
+        
+        closeButton.addActionListener(e -> {
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose(); // zamyka JFrame
+            }
+        });
 
+        JPanel buttonsPanel = new JPanel();
         buttonsPanel.add(addButton);
         buttonsPanel.add(removeButton);
-        add(buttonsPanel, BorderLayout.SOUTH);
+        controlPanel.add(buttonsPanel, BorderLayout.NORTH);
+        JPanel closePanel = new JPanel();
+        closePanel.add(closeButton);
+        controlPanel.add(closePanel);
+        add(controlPanel, BorderLayout.SOUTH);
     }
 
     public Map<Integer, double[]> getData() {
