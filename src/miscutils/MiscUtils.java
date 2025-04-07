@@ -24,7 +24,7 @@ public class MiscUtils {
         if( o == null )
             return "";
         if (o.getClass().isArray()) {
-            System.err.println( o.getClass().getCanonicalName() );
+            //System.err.println( o.getClass().getCanonicalName() );
             StringBuilder s = new StringBuilder("[");
             Object [] t = (Object [])o;
             for( Object e : t )

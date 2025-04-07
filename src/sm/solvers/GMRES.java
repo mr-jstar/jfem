@@ -66,7 +66,7 @@ public class GMRES implements Solver {
             }
         }
 
-        System.out.println("GMRES: in " + maxIter + " iterations error dropped to " + e1[maxIter]);
+        System.out.println("GMRES: in " + maxIter + " iterations error dropped to " + Math.abs(e1[maxIter]));
         return updateSolution(x, V, H, e1, maxIter);
     }
 

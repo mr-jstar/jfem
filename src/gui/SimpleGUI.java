@@ -28,9 +28,12 @@ import sm.solvers.GMRES;
  */
 public class SimpleGUI extends JFrame {
 
+    private static final Font FONT12 = new Font("SansSerif", Font.PLAIN, 12);
     private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
     private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
-    private static Font CURRENT_FONT = FONT18;
+
+    private final Font[] fonts = {FONT12, FONT18, FONT24};
+    private static Font currentFont = FONT18;
 
     private static final String CONFIG_FILE = ".femconfig";
 
@@ -84,13 +87,13 @@ public class SimpleGUI extends JFrame {
         setSize(1600, 1200);
         setLocationRelativeTo(null);
 
-        UIManager.put("OptionPane.messageFont", CURRENT_FONT);
-        UIManager.put("OptionPane.buttonFont", CURRENT_FONT);
+        UIManager.put("OptionPane.messageFont", currentFont);
+        UIManager.put("OptionPane.buttonFont", currentFont);
 
         JPanel buttonPanel = new JPanel();
 
         for (JButton btn : buttons) {
-            btn.setFont(CURRENT_FONT);
+            btn.setFont(currentFont);
         }
 
         loadButton.addActionListener(e -> loadFile());
@@ -109,7 +112,7 @@ public class SimpleGUI extends JFrame {
             buttonPanel.add(btn);
         }
 
-        JMenuBar menuBar = createMenuBar(buttons, CURRENT_FONT);
+        JMenuBar menuBar = createMenuBar(buttons, currentFont);
 
         options.put("showMesh", false);
         options.put("showField", false);
@@ -117,20 +120,45 @@ public class SimpleGUI extends JFrame {
         options.put("showSubDomains", true);
         options.put("inDefBoundary", false);
         options.put("inDefSubdomain", false);
-        menuBar.add(options(options, CURRENT_FONT));
+        menuBar.add(options(options, currentFont));
+
+        JMenu guiOpts = new JMenu("GUI options");
+        ButtonGroup fgroup = new ButtonGroup();
+        guiOpts.add(new JMenuItem("Font size"));
+        for (Font f : fonts) {
+            JRadioButtonMenuItem fontOpt = new JRadioButtonMenuItem("\t\t\t" + String.valueOf(f.getSize()));
+            final Font cf = f;
+            fontOpt.addActionListener(e -> {
+                currentFont = cf;
+                setFontRecursively(this, currentFont);
+            });
+            fontOpt.setSelected(f == currentFont);
+            fgroup.add(fontOpt);
+            guiOpts.add(fontOpt);
+        }
+        guiOpts.addSeparator();
+        JCheckBoxMenuItem barOpt = new JCheckBoxMenuItem("Show buttons");
+        barOpt.setState(true);
+        barOpt.addActionListener(e -> {
+            buttonPanel.setVisible(barOpt.getState());
+        });
+        guiOpts.add(barOpt);
+
+        setFontRecursively(guiOpts, currentFont);
+        menuBar.add(guiOpts);
         setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
 
         message = new JLabel("OK");
-        message.setFont(CURRENT_FONT);
+        message.setFont(currentFont);
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
 
         add(buttonPanel, BorderLayout.NORTH);
         add(drawingPanel, BorderLayout.CENTER);
         add(messagePanel, BorderLayout.SOUTH);
-        
+
         switchAllButtons(false);
         loadButton.setEnabled(true);
         exitButton.setEnabled(true);
@@ -149,16 +177,16 @@ public class SimpleGUI extends JFrame {
         opts.setFont(font);
 
         for (String s : optsMap.keySet()) {
-            JCheckBoxMenuItem nextOpt = new JCheckBoxMenuItem(s, optsMap.get(s));
-            nextOpt.setFont(font);
+            JCheckBoxMenuItem newOpt = new JCheckBoxMenuItem(s, optsMap.get(s));
+            newOpt.setFont(font);
 
             final String key = s;
 
-            nextOpt.addActionListener(e -> {
-                optsMap.put(key, nextOpt.getState());
+            newOpt.addActionListener(e -> {
+                optsMap.put(key, newOpt.getState());
             });
 
-            opts.add(nextOpt);
+            opts.add(newOpt);
         }
 
         return opts;
@@ -170,12 +198,12 @@ public class SimpleGUI extends JFrame {
         menu.setFont(font);
 
         for (JButton b : btns) {
-            JMenuItem nextItem = new JMenuItem(b.getText());
-            nextItem.setFont(font);
+            JMenuItem newItem = new JMenuItem(b.getText());
+            newItem.setFont(font);
             for (ActionListener al : b.getActionListeners()) {
-                nextItem.addActionListener(al);
+                newItem.addActionListener(al);
             }
-            menu.add(nextItem);
+            menu.add(newItem);
         }
 
         menuBar.add(menu);
@@ -185,7 +213,7 @@ public class SimpleGUI extends JFrame {
 
     private void loadFile() {
         JFileChooser fileChooser = new JFileChooser(getLastUsedDirectory());
-        setFontRecursively(fileChooser, CURRENT_FONT);
+        setFontRecursively(fileChooser, currentFont);
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File meshFile = fileChooser.getSelectedFile();
@@ -208,9 +236,9 @@ public class SimpleGUI extends JFrame {
                 xy.clear();
                 bndNodes.clear();
                 model = null;
-                fieldButton.setEnabled(false);
                 drawingPanel.repaint();
                 switchAllButtons(true);
+                fieldButton.setEnabled(false);
                 message.setText("Mesh loaded from: " + meshFile.getAbsolutePath() + "\n" + mesh.getNoVertices() + " vertices & " + mesh.getNoElems() + " elements");
             } catch (Exception e) {
                 mesh = null;
@@ -257,10 +285,10 @@ public class SimpleGUI extends JFrame {
             drawingPanel.repaint();
         } else {
             if (options.get("showMesh")) {
-                JOptionPane.showMessageDialog(this, "Click on the node to select it, "
-                        + "click on selected to unselect,\n"
-                        + "drag mouse to select/deselect all nodes in the rectangle\n"
-                        + "when done click button again to be asked for the value.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
+                JOptionPane.showMessageDialog(this, """
+                                                    Click on the node to select it, click on selected to unselect,
+                                                    drag mouse to select/deselect all nodes in the rectangle
+                                                    when done click button again to be asked for the value.""", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefBoundary", true);
                 currentSelection.clear();
                 switchAllButtons(false);
@@ -302,9 +330,9 @@ public class SimpleGUI extends JFrame {
                         throw new NumberFormatException();
                     }
                     sbd = Integer.parseInt(m);
-                    if( ! subDomParameters.containsKey(sbd) ) {
-                        Double [] npar = { 1.0, 0.0 };
-                        subDomParameters.put( sbd, npar);
+                    if (!subDomParameters.containsKey(sbd)) {
+                        Double[] npar = {1.0, 0.0};
+                        subDomParameters.put(sbd, npar);
                     }
                     for (Integer v : currentSelection) {
                         mesh.getElem(v).setSubdomain(sbd);
@@ -320,15 +348,15 @@ public class SimpleGUI extends JFrame {
                 System.err.println(bndNodes);
             }
             model = null;
-            options.put("showField",false);
+            options.put("showField", false);
             fieldButton.setEnabled(false);
             drawingPanel.repaint();
         } else {
             if (options.get("showMesh")) {
-                JOptionPane.showMessageDialog(this, "Click on the element to select it, "
-                        + "click on selected to unselect,\n"
-                        + "drag mouse to select/deselect all elements in the rectangle\n"
-                        + "when done click button again to be asked for the subdomain.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
+                JOptionPane.showMessageDialog(this, """
+                                                    Click on the element to select it, click on selected to unselect,
+                                                    drag mouse to select/deselect all elements in the rectangle
+                                                    when done click button again to be asked for the subdomain.""", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                 options.put("inDefSubdomain", true);
                 currentSelection.clear();
                 switchAllButtons(false);
@@ -352,11 +380,11 @@ public class SimpleGUI extends JFrame {
 
             String[] colN = {"SubDom", "Materials", "Sources"};
 
-            MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN, CURRENT_FONT);
-            
+            MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN, currentFont);
+
             panel.addModelListener(e -> {
                 model = null;
-                options.put("showField",false);
+                options.put("showField", false);
                 fieldButton.setEnabled(false);
                 drawingPanel.repaint();
             });
@@ -368,7 +396,7 @@ public class SimpleGUI extends JFrame {
                     System.err.println(MiscUtils.mapToString(subDomParameters));
                 }
             });
-            setFontRecursively(frame, CURRENT_FONT);
+            setFontRecursively(frame, currentFont);
             frame.setVisible(true);
         });
     }
@@ -696,7 +724,7 @@ public class SimpleGUI extends JFrame {
                 }
 
                 g.setColor(Color.BLUE);
-                g.setFont(CURRENT_FONT);
+                g.setFont(currentFont);
                 for (int v = 0; v < mesh.getNoVertices(); v++) {
                     PointPosition p = xy.get(v);
                     g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
