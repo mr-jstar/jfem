@@ -7,7 +7,6 @@ import fem.EleIntegral;
 import fem.FEM;
 import fem.TetraLaplace;
 import fem.TriangleLaplace;
-import fem.mesh.Elem;
 import fem.mesh.IMesh;
 import javax.swing.*;
 import java.awt.*;
@@ -31,6 +30,8 @@ public class SimpleGUI extends JFrame {
 
     private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
     private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
+    private static Font CURRENT_FONT = FONT18;
+    
     private static final String CONFIG_FILE = ".femconfig";
 
     private final int vSize = 2;
@@ -66,9 +67,7 @@ public class SimpleGUI extends JFrame {
     private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
     private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
 
-    private final Color[] subDomColors = {
-        Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY, Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY
-    };
+    private final Map<Integer,Color> subDomColors = new HashMap<>();
 
     private Map<Integer, double[]> subDomParameters = new HashMap<>(); // [0] - materials, [1] - sources
 
@@ -78,8 +77,8 @@ public class SimpleGUI extends JFrame {
         setSize(1600, 1200);
         setLocationRelativeTo(null);
 
-        UIManager.put("OptionPane.messageFont", FONT18);
-        UIManager.put("OptionPane.buttonFont", FONT18);
+        UIManager.put("OptionPane.messageFont", CURRENT_FONT);
+        UIManager.put("OptionPane.buttonFont", CURRENT_FONT);
 
         JPanel buttonPanel = new JPanel();
         loadButton = new JButton("Load mesh");
@@ -101,7 +100,7 @@ public class SimpleGUI extends JFrame {
         };
 
         for (JButton btn : buttons) {
-            btn.setFont(FONT18);
+            btn.setFont(CURRENT_FONT);
         }
 
         loadButton.addActionListener(e -> loadFile());
@@ -120,7 +119,7 @@ public class SimpleGUI extends JFrame {
             buttonPanel.add(btn);
         }
 
-        JMenuBar menuBar = createMenuBar(buttons, FONT18);
+        JMenuBar menuBar = createMenuBar(buttons, CURRENT_FONT);
 
         options.put("showMesh", false);
         options.put("showField", false);
@@ -128,13 +127,13 @@ public class SimpleGUI extends JFrame {
         options.put("showSubDomains", true);
         options.put("inDefBoundary", false);
         options.put("inDefSubdomain", false);
-        menuBar.add(options(options, FONT18));
+        menuBar.add(options(options, CURRENT_FONT));
         setJMenuBar(menuBar);
 
         drawingPanel = new DrawingPanel();
 
         message = new JLabel("OK");
-        message.setFont(FONT18);
+        message.setFont(CURRENT_FONT);
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
 
@@ -186,7 +185,7 @@ public class SimpleGUI extends JFrame {
 
     private void loadFile() {
         JFileChooser fileChooser = new JFileChooser(getLastUsedDirectory());
-        setFontRecursively(fileChooser, FONT18);
+        setFontRecursively(fileChooser, CURRENT_FONT);
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File meshFile = fileChooser.getSelectedFile();
@@ -298,6 +297,7 @@ public class SimpleGUI extends JFrame {
                     for (Integer v : currentSelection) {
                         mesh.getElem(v).setSubdomain(sbd);
                     }
+                    rebuildSubDomainColors();
                     System.err.println(MiscUtils.mapToString(subDomParameters));
                     options.put("inDefSubdomain", false);
                     message.setText("OK");
@@ -330,9 +330,9 @@ public class SimpleGUI extends JFrame {
         }
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Subdomain(s) parameters");
-            frame.setSize(300, 200);
+            frame.setSize(400, 200);
             frame.setLocationRelativeTo(SimpleGUI.this);
-
+            
             String[] colN = {"SubDom", "Materials", "Sources"};
 
             MapEditorPanel panel = new MapEditorPanel(subDomParameters, colN);
@@ -344,6 +344,7 @@ public class SimpleGUI extends JFrame {
                     System.err.println(MiscUtils.mapToString(subDomParameters));
                 }
             });
+            setFontRecursively(frame, CURRENT_FONT);
             frame.setVisible(true);
         });
     }
@@ -421,6 +422,16 @@ public class SimpleGUI extends JFrame {
                 double[] p = {1.0, 0.0};
                 subDomParameters.put(s, p);
             }
+        }
+        rebuildSubDomainColors();
+    }
+    
+    private void rebuildSubDomainColors() {
+        subDomColors.clear();
+        int c = 240, dc= 20;
+        for( Integer k : subDomParameters.keySet() ) {
+            subDomColors.put( k, new Color( c % 256 , c % 256, c %256 ));
+            c -= dc;
         }
     }
 
@@ -556,7 +567,7 @@ public class SimpleGUI extends JFrame {
             Graphics2D g2 = (Graphics2D) g;
             g.setColor(Color.WHITE);
             g.fillRect(0, 0, getWidth(), getHeight());
-
+            
             if (options.get("inDefBoundary") && (currX != prevX || currY != prevY)) {
                 int xp = Math.min(currX, prevX);
                 int yp = Math.min(currY, prevY);
@@ -636,7 +647,7 @@ public class SimpleGUI extends JFrame {
                         if (options.get("inDefSubdomain") && currentSelection.contains(e)) {
                             g2.setColor(Color.WHITE);
                         } else {
-                            g2.setColor(subDomColors[mesh.getElem(e).getSubdomain()]);
+                            g2.setColor(subDomColors.get(mesh.getElem(e).getSubdomain() ));
                         }
                         for (int i = 0; i < ev.length - 1; i++) {
                             PointPosition p = xy.get(ev[i]);
@@ -658,7 +669,7 @@ public class SimpleGUI extends JFrame {
                 }
 
                 g.setColor(Color.BLUE);
-                g.setFont(FONT18);
+                g.setFont(CURRENT_FONT);
                 for (int v = 0; v < mesh.getNoVertices(); v++) {
                     PointPosition p = xy.get(v);
                     g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);

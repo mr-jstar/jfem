@@ -127,7 +127,7 @@ public class MapEditorPanel extends JPanel {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            return columnIndex != 0 || true; // Klucze edytowalne jeśli chcesz
+            return true; // Klucze są edytowalne
         }
 
         @Override
@@ -139,7 +139,7 @@ public class MapEditorPanel extends JPanel {
                         if (!keys.contains(newKey) || newKey == keys.get(rowIndex)) {
                             keys.set(rowIndex, newKey);
                         } else {
-                            JOptionPane.showMessageDialog(null, "Klucz już istnieje.");
+                            JOptionPane.showMessageDialog(null, "Key already exists.");
                         }
                     }
                     case 1 -> values.get(rowIndex)[0] = Double.parseDouble(aValue.toString());
