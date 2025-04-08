@@ -24,6 +24,9 @@ import sm.solvers.GMRES;
 
 /**
  *
+ * A simple GUI for FEM demo package Allows reading of meshes, draws 2D meshes
+ * and allows to set-up 2D FEM elliptic model with Dirichlet BC
+ *
  * @author jstar
  */
 public class SimpleGUI extends JFrame {
@@ -37,19 +40,19 @@ public class SimpleGUI extends JFrame {
 
     private static final String CONFIG_FILE = ".femconfig";
 
-    private final int vSize = 2;
+    private final int vSize = 2;   // radius of mesh vertex symbol
 
-    private final int vertexSelectionRadius = 50;
+    private final int vertexSelectionRadius = 100;  // precision for vertex selection
 
     private DrawingPanel drawingPanel;
 
     private IMesh mesh;
     private FEM model;
 
-    private final Map<String, Boolean> options = new HashMap<>();
-    private final Set<Integer> currentSelection = new TreeSet<>();
-    private final ArrayList<PointPosition> xy = new ArrayList<>();
-    private final TreeMap<Integer, Double> bndNodes = new TreeMap<>();
+    private final Map<String, Boolean> options = new HashMap<>();   // diffrent FEM related options
+    private final Set<Integer> currentSelection = new TreeSet<>();  // current selection of vertices of elements
+    private final ArrayList<PointPosition> xy = new ArrayList<>();  // integer coordinates of vertices (in the drawingPanel space)
+    private final TreeMap<Integer, Double> bndNodes = new TreeMap<>();  // Dirichlet boundary nodes: Vertex# -> value at
 
     private final String DEFAULT_BND_TEXT = "Add DBC(s)";
     private final String DEFAULT_SUB_TEXT = "Modify subdomain(s)";
@@ -72,14 +75,16 @@ public class SimpleGUI extends JFrame {
         clearButton, saveButton, exitButton
     };
 
-    private final JLabel message;
+    private final JLabel message;  // Used to show status messages
 
-    private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
-    private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};
+    private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};  // 2D mesh vertices coordinates x-range
+    private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};  // and y-range
 
-    private final Map<Integer, Color> subDomColors = new HashMap<>();
+    private final Map<Integer, Color> subDomColors = new HashMap<>(); // colors to show sub-domains
 
     private Map<Integer, Double[]> subDomParameters = new HashMap<>(); // [0] - materials, [1] - sources
+
+    private boolean printDiag = false;  // if true, prints some info to System.err
 
     public SimpleGUI() {
         setTitle("Simple FEM GUI (Swing)");
@@ -120,6 +125,7 @@ public class SimpleGUI extends JFrame {
         options.put("showSubDomains", true);
         options.put("inDefBoundary", false);
         options.put("inDefSubdomain", false);
+
         menuBar.add(options(options, currentFont));
 
         JMenu guiOpts = new JMenu("GUI options");
@@ -130,7 +136,9 @@ public class SimpleGUI extends JFrame {
             final Font cf = f;
             fontOpt.addActionListener(e -> {
                 currentFont = cf;
-                setFontRecursively(this, currentFont);
+                setFontRecursively(this, currentFont, 0);
+                UIManager.put("OptionPane.messageFont", currentFont);
+                UIManager.put("OptionPane.buttonFont", currentFont);
             });
             fontOpt.setSelected(f == currentFont);
             fgroup.add(fontOpt);
@@ -143,8 +151,15 @@ public class SimpleGUI extends JFrame {
             buttonPanel.setVisible(barOpt.getState());
         });
         guiOpts.add(barOpt);
+        guiOpts.addSeparator();
+        JCheckBoxMenuItem diagOpt = new JCheckBoxMenuItem("Print some info to System.err");
+        diagOpt.setState(false);
+        diagOpt.addActionListener(e -> {
+            printDiag = diagOpt.getState();
+        });
+        guiOpts.add(diagOpt);
 
-        setFontRecursively(guiOpts, currentFont);
+        setFontRecursively(guiOpts, currentFont, 0);
         menuBar.add(guiOpts);
         setJMenuBar(menuBar);
 
@@ -163,15 +178,18 @@ public class SimpleGUI extends JFrame {
         loadButton.setEnabled(true);
         exitButton.setEnabled(true);
 
+        setFontRecursively(this, currentFont, 0);
         setVisible(true);
     }
 
+    // Activates/deactivates all buttons  ( ANALOG FOR MENU TO BE DONE!!! )
     private void switchAllButtons(boolean flag) {
         for (JButton btn : buttons) {
             btn.setEnabled(flag);
         }
     }
 
+    // Menu to set/un-set FEM-related options
     private JMenu options(Map<String, Boolean> optsMap, Font font) {
         JMenu opts = new JMenu("Options");
         opts.setFont(font);
@@ -192,6 +210,7 @@ public class SimpleGUI extends JFrame {
         return opts;
     }
 
+    // Menu bar out of defined buttons
     private JMenuBar createMenuBar(JButton[] btns, Font font) {
         JMenuBar menuBar = new JMenuBar();
         JMenu menu = new JMenu("Menu");
@@ -211,9 +230,10 @@ public class SimpleGUI extends JFrame {
         return menuBar;
     }
 
+    // Action for Load mesh button/menu item
     private void loadFile() {
         JFileChooser fileChooser = new JFileChooser(getLastUsedDirectory());
-        setFontRecursively(fileChooser, currentFont);
+        setFontRecursively(fileChooser, currentFont, 0);
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File meshFile = fileChooser.getSelectedFile();
@@ -247,18 +267,28 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Action for Draw mesh button/menu item
     private void drawMesh() {
         options.put("showMesh", true);
         drawingPanel.repaint();
     }
 
+    // Action for AD DBC(s) button/menu item
     private void modifyBoundary() {
         if (options.get("inDefSubdomain")) {
             return;
         }
         if (options.get("inDefBoundary")) {
             if (currentSelection.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No nodes selected, try again.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
+                if (JOptionPane.showConfirmDialog(this, "No nodes selected, want to try again?",
+                        DEFAULT_BND_TEXT, JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                    options.put("inDefBoundary", false);
+                    switchAllButtons(true);
+                    bndButton.setText(DEFAULT_BND_TEXT);
+                    bndButton.setForeground(Color.BLACK);
+                    message.setText("OK");
+                    return;
+                }
             } else {
                 bndButton.setText(DEFAULT_BND_TEXT);
                 bndButton.setForeground(Color.BLACK);
@@ -278,7 +308,9 @@ public class SimpleGUI extends JFrame {
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_BND_TEXT, JOptionPane.QUESTION_MESSAGE);
                 }
-                System.err.println(bndNodes);
+                if (printDiag) {
+                    System.err.println(bndNodes);
+                }
             }
             model = null;
             fieldButton.setEnabled(false);
@@ -301,6 +333,7 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Action for Clear DBC(s) button/menu item
     private void clrBoundary() {
         model = null;
         bndNodes.clear();
@@ -313,13 +346,22 @@ public class SimpleGUI extends JFrame {
         drawingPanel.repaint();
     }
 
+    // Action for Modify subdomain(s) button/menu item
     private void modifySubdomains() {
         if (options.get("inDefBoundary")) {
             return;
         }
         if (options.get("inDefSubdomain")) {
             if (currentSelection.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No elements selected, try again.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
+                if (JOptionPane.showConfirmDialog(this, "No elements selected, want to try again?",
+                        DEFAULT_SUB_TEXT, JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                    options.put("inDefSubdomain", false);
+                    switchAllButtons(true);
+                    subDomButton.setText(DEFAULT_SUB_TEXT);
+                    subDomButton.setForeground(Color.BLACK);
+                    message.setText("OK");
+                    return;
+                }
             } else {
                 subDomButton.setText(DEFAULT_SUB_TEXT);
                 subDomButton.setForeground(Color.BLACK);
@@ -338,14 +380,15 @@ public class SimpleGUI extends JFrame {
                         mesh.getElem(v).setSubdomain(sbd);
                     }
                     rebuildSubDomainColors();
-                    System.err.println(MiscUtils.mapToString(subDomParameters));
+                    if (printDiag) {
+                        System.err.println(MiscUtils.mapToString(subDomParameters));
+                    }
                     switchAllButtons(true);
                     options.put("inDefSubdomain", false);
                     message.setText("OK");
                 } catch (NumberFormatException e) {
                     JOptionPane.showMessageDialog(this, "Invalid value, click the button once more.", DEFAULT_SUB_TEXT, JOptionPane.QUESTION_MESSAGE);
                 }
-                System.err.println(bndNodes);
             }
             model = null;
             options.put("showField", false);
@@ -369,13 +412,14 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Action for Edit materials button/menu item
     private void subDomainsParameters() {
         if (mesh == null) {
             return;
         }
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Subdomain(s) parameters");
-            frame.setSize(400, 200);
+            frame.setSize(400, 500);
             frame.setLocationRelativeTo(SimpleGUI.this);
 
             String[] colN = {"SubDom", "Materials", "Sources"};
@@ -393,14 +437,17 @@ public class SimpleGUI extends JFrame {
                 @Override
                 public void windowClosed(WindowEvent e) {
                     subDomParameters = panel.getData();
-                    System.err.println(MiscUtils.mapToString(subDomParameters));
+                    if (printDiag) {
+                        System.err.println(MiscUtils.mapToString(subDomParameters));
+                    }
                 }
             });
-            setFontRecursively(frame, currentFont);
+            setFontRecursively(frame, currentFont, 0);
             frame.setVisible(true);
         });
     }
 
+    // Action for Compute button/menu item
     private void computeField() {
         EleIntegral integral = mesh.getElem(0).getVertices().length == 3 ? new TriangleLaplace() : new TetraLaplace();
 
@@ -447,6 +494,7 @@ public class SimpleGUI extends JFrame {
         //System.out.println("V in <" + minmax[0] + "," + minmax[1] + ">");
     }
 
+    // Helper - get mesh vertices coordinates range
     private void computeMeshRange() {
         xrange[0] = yrange[0] = Double.MAX_VALUE;
         xrange[1] = yrange[1] = -Double.MAX_VALUE;
@@ -469,6 +517,7 @@ public class SimpleGUI extends JFrame {
         yrange[1] -= yrange[0];
     }
 
+    // Helper - build initial material(s) parameters
     private void computeInitialSubdomains() {
         subDomParameters.clear();
         for (int e = 0; e < mesh.getNoElems(); e++) {
@@ -481,6 +530,7 @@ public class SimpleGUI extends JFrame {
         rebuildSubDomainColors();
     }
 
+    // Helper - rebuild color map used to show sub-domains
     private void rebuildSubDomainColors() {
         subDomColors.clear();
         int c = 240, dc = 20;
@@ -490,6 +540,7 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Helper - get range values in a double vector
     private static double[] range(double[] v) {
         double[] range = {v[0], v[0]};
         for (int i = 1; i < v.length; i++) {
@@ -503,20 +554,40 @@ public class SimpleGUI extends JFrame {
         return range;
     }
 
+    // Action for Draw field button/menu item
     private void drawField() {
         options.put("showField", true);
         drawingPanel.repaint();
     }
 
-    private void setFontRecursively(Component comp, Font font) {
+    // Helper - changes fonts of all components
+    private void setFontRecursively(Component comp, Font font, int d) {
+        if (comp == null) {
+            return;
+        }
         comp.setFont(font);
+        // Diagnostics
+        if (printDiag) {
+            for (int i = 0; i < d; i++) {
+                System.err.print("\t");
+            }
+            System.err.println(comp.getClass().getName() + " : " + (comp instanceof Container ? ("container (" + ((Container) comp).getComponentCount() + ")") : "other"));
+        }
+        //
         if (comp instanceof Container container) {
             for (Component child : container.getComponents()) {
-                setFontRecursively(child, font);
+                setFontRecursively(child, font, d + 1);
+            }
+        }
+        // Needs specific navigation, since JMenu does not show menu components as Components
+        if (comp instanceof JMenu menu) {
+            for (int i = 0; i < menu.getItemCount(); i++) {
+                setFontRecursively(menu.getItem(i), font, d + 1);
             }
         }
     }
 
+    // Helper - retrieves the last used directory from the config file
     private String getLastUsedDirectory() {
         File configFile = new File(CONFIG_FILE);
         if (configFile.exists()) {
@@ -529,6 +600,7 @@ public class SimpleGUI extends JFrame {
         return ".";
     }
 
+    // Helper - saves the last used directory
     private void saveLastUsedDirectory(String directory) {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(CONFIG_FILE))) {
             bw.write(directory);
@@ -537,6 +609,7 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Helper -finds vertex nearest to (x,y) - clicked by the mouse
     private int findNearestVertex(int x, int y) {
         int nV = -1;
         int minDistance = Integer.MAX_VALUE;
@@ -551,11 +624,12 @@ public class SimpleGUI extends JFrame {
         return nV;
     }
 
+    // Starts the application
     public static void main(String[] args) {
         SwingUtilities.invokeLater(SimpleGUI::new);
     }
 
-    // Panel do rysowania
+    // All drawing implemented here
     class DrawingPanel extends JPanel {
 
         private int prevX, prevY;
@@ -571,7 +645,9 @@ public class SimpleGUI extends JFrame {
                     if (options.get("inDefBoundary")) {
                         int nearestVertex = findNearestVertex(prevX, prevY);
                         if (nearestVertex >= 0) {
-                            System.err.println(prevX + " " + prevY + " => " + nearestVertex);
+                            if (printDiag) {
+                                System.err.println(prevX + " " + prevY + " => " + nearestVertex);
+                            }
                             if (currentSelection.contains(nearestVertex)) {
                                 currentSelection.remove(nearestVertex);
                             } else {
@@ -583,7 +659,9 @@ public class SimpleGUI extends JFrame {
                     if (options.get("inDefSubdomain")) {
                         int element = findClickedElement(prevX, prevY);
                         if (element >= 0) {
-                            System.err.println(prevX + " " + prevY + " => Element" + element);
+                            if (printDiag) {
+                                System.err.println(prevX + " " + prevY + " => Element" + element);
+                            }
                             if (currentSelection.contains(element)) {
                                 currentSelection.remove(element);
                             } else {
@@ -618,6 +696,24 @@ public class SimpleGUI extends JFrame {
 
         @Override
         protected void paintComponent(Graphics g) {
+            if (mesh == null) {
+                return;
+            } else {
+                double margin = 0.05;
+                double xbase = margin * getWidth();
+                double ybase = margin * getHeight();
+                double width = getWidth() * (1 - 2 * margin);
+                double height = getHeight() * (1 - 2 * margin);
+
+                xy.clear();
+                for (int v = 0; v < mesh.getNoVertices(); v++) {
+                    double[] x = mesh.getVertex(v).getX();
+                    int ix = (int) Math.round(xbase + (x[0] - xrange[0]) / xrange[1] * width);
+                    int iy = (int) Math.round(ybase + (1.0 - (x[1] - yrange[0]) / yrange[1]) * height);
+                    xy.add(new PointPosition(ix, iy));
+                }
+            }
+
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g;
             g.setColor(Color.WHITE);
@@ -679,20 +775,6 @@ public class SimpleGUI extends JFrame {
                     return;
                 }
 
-                double margin = 0.05;
-                double xbase = margin * getWidth();
-                double ybase = margin * getHeight();
-                double width = getWidth() * (1 - 2 * margin);
-                double height = getHeight() * (1 - 2 * margin);
-
-                xy.clear();
-                for (int v = 0; v < mesh.getNoVertices(); v++) {
-                    double[] x = mesh.getVertex(v).getX();
-                    int ix = (int) Math.round(xbase + (x[0] - xrange[0]) / xrange[1] * width);
-                    int iy = (int) Math.round(ybase + (1.0 - (x[1] - yrange[0]) / yrange[1]) * height);
-                    xy.add(new PointPosition(ix, iy));
-                }
-
                 int[] ev = new int[mesh.getElem(0).getVertices().length + 1];
                 int[] evX = new int[mesh.getElem(0).getVertices().length];
                 int[] evY = new int[evX.length];
@@ -752,14 +834,6 @@ public class SimpleGUI extends JFrame {
                     if (fld != null) {
                         double[] frng = range(fld);
                         ColorMap cm = new ColorMap((float) frng[0], (float) frng[1]);
-                        /*
-                    g.setColor(Color.RED);
-                    int dh = g.getFontMetrics().getHeight();
-                    for (int v = 0; v < fld.length; v++) {
-                        PointPosition p = xy.get(v);
-                        g.drawString(String.format("%6.3g", fld[v]), p.x, p.y + dh);
-                    }
-                         */
                         double[] efld = new double[mesh.getElem(0).getVertices().length];
                         for (int e = 0; e < mesh.getNoElems(); e++) {
                             int[] ev = mesh.getElem(e).getVertices();
@@ -768,11 +842,28 @@ public class SimpleGUI extends JFrame {
                             }
                             fillElem(g, ev, efld, cm);
                         }
+                        // The legend
+                        int lwidth = (int) (0.7 * getWidth());
+                        int lheight = 20;
+                        int bottomMargin = 20;
+                        int xmargin = 3;
+                        int pxl = (int) (0.15 * getWidth());
+                        int pyl = getHeight() - lheight - bottomMargin;
+                        Image legend = cm.createColorScaleImage(lwidth, lheight, ColorMap.Menu.HORIZONTAL);
+
+                        g.drawImage(legend, pxl, pyl, this);
+                        g.setColor(Color.BLACK);
+                        String low = String.format("%.3g", frng[0]);
+
+                        g.drawString(low, pxl - getFontMetrics(currentFont).stringWidth(low) - xmargin, pyl + 3 * lheight / 4);
+                        String high = String.format("%.3g", frng[1]);
+                        g.drawString(high, pxl + lwidth + xmargin, pyl + 3 * lheight / 4);
                     }
                 }
             }
         }
 
+        // Get int coordites of all vertices in v
         private PointPosition[] intCoordinatesForElem(int[] v) {
             PointPosition[] p = new PointPosition[v.length];
             for (int i = 0; i < v.length; i++) {
@@ -781,6 +872,7 @@ public class SimpleGUI extends JFrame {
             return p;
         }
 
+        // Shows field fld over the triangle v, uses cm to represent fld value
         public void fillElem(Graphics g, int[] v, double[] fld, ColorMap cm) {
             PointPosition[] p = intCoordinatesForElem(v);
             int minX = Math.min(p[0].x, Math.min(p[1].x, p[2].x));
@@ -802,6 +894,7 @@ public class SimpleGUI extends JFrame {
             }
         }
 
+        // Find triangle on which the mouse button was pressed
         private int findClickedElement(int x, int y) {
             for (int e = 0; e < mesh.getNoElems(); e++) {
                 if (pointInTriangle(x, y, intCoordinatesForElem(mesh.getElem(e).getVertices()))) {
@@ -811,6 +904,7 @@ public class SimpleGUI extends JFrame {
             return -1;
         }
 
+        // Checks if (x,y) is in triangle p
         private boolean pointInTriangle(int x, int y, PointPosition[] p) {
             int x1 = p[0].x, y1 = p[0].y;
             int x2 = p[1].x, y2 = p[1].y;
@@ -826,10 +920,12 @@ public class SimpleGUI extends JFrame {
             return !(hasNeg && hasPos);
         }
 
+        // Side of (x,y) relative to (x1,y1)-(x2,y2)
         private double sign(double x, double y, double x1, double y1, double x2, double y2) {
             return (x - x2) * (y1 - y2) - (x1 - x2) * (y - y2);
         }
 
+        // Barycentric coordinates of (x,y) in triangle p
         private double[] getBarycentricCoordinates(int x, int y, PointPosition[] p) {
             double x1 = p[0].x, y1 = p[0].y;
             double x2 = p[1].x, y2 = p[1].y;
@@ -844,12 +940,14 @@ public class SimpleGUI extends JFrame {
             return new double[]{l1, l2, l3}; // barycentryczne współczynniki (α, β, γ)
         }
 
+        // Action for Clear button/menu item
         public void clear() {
             options.put("showMesh", false);
             options.put("showField", false);
             repaint();
         }
 
+        // Action for Save image button/menu item
         public void saveImage() {
             try {
                 File output = new File("fem_fig.png");
@@ -865,6 +963,7 @@ public class SimpleGUI extends JFrame {
         }
     }
 
+    // Helper holding integer (relative to drawing window) coordinates of a Vertex
     class PointPosition {
 
         int x;

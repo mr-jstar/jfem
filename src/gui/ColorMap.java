@@ -15,6 +15,8 @@ public class ColorMap {
     private final static float BLUE_HUE;
     private final static float RED_HUE;
     
+    public static enum Menu { HORIZONTAL, VERTICAL};
+    
     static {
         Color color = Color.RED;
         RED_HUE = Color.RGBtoHSB(color.getRed(), color.getGreen(), color.getBlue(), null)[0];
@@ -61,9 +63,9 @@ public class ColorMap {
         return Color.getHSBColor(hue, 1.0f, 1.0f);
     }
 
-    public Image createColorScaleImage(int width, int height, char orientation) {
+    public Image createColorScaleImage(int width, int height, ColorMap.Menu orientation) {
         BufferedImage image = new BufferedImage(width, height,BufferedImage.TYPE_INT_ARGB);
-        if (orientation == 'H') {
+        if (orientation == Menu.HORIZONTAL) {
             for (int x = 0; x < width; x++) {
                 double value = min + (max - min) * x / width;
                 int color = argbColorForValue((float)value);
