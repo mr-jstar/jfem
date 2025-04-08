@@ -180,8 +180,8 @@ public class Util {
         String nodeFile = path.replaceFirst("\\.ele$", ".node");
         String eleFile = path.replaceFirst("\\.node$", ".ele");
         String edgeFile = eleFile.replaceFirst("\\.ele", ".edge");
-        System.out.println(nodeFile);
-        System.out.println(eleFile);
+        //System.out.println(nodeFile);
+        //System.out.println(eleFile);
         String line = null;
         List<Vertex> vl;
         List<Elem> trl;
