@@ -7,6 +7,8 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Scanner;
 import java.util.Set;
 
 /**
@@ -35,6 +37,12 @@ public class PolyEditor extends JFrame {
         JMenuItem saveItem = new JMenuItem("Save");
         saveItem.addActionListener(e -> panel.saveToFile());
         fileMenu.add(saveItem);
+
+        fileMenu.addSeparator();
+        JMenuItem exportItem = new JMenuItem("Export to .poly");
+        exportItem.addActionListener(e -> panel.exportToPoly());
+        fileMenu.add(exportItem);
+
         fileMenu.addSeparator();
         JMenuItem exitItem = new JMenuItem("Exit");
         exitItem.addActionListener(e -> dispose());
@@ -152,8 +160,8 @@ class DrawingPanel extends JPanel {
                         polygons.removeIf(pol -> pol.contains(p));
                         adjustCursor();
                     } else {
-                        int x = (int) (Math.round( (p.getX()-xoffset) / (float) snap) * snap) + xoffset;
-                        int y = (int) (Math.round( (p.getY()-yoffset) / (float) snap) * snap) + yoffset;
+                        int x = (int) (Math.round((p.getX() - xoffset) / (float) snap) * snap) + xoffset;
+                        int y = (int) (Math.round((p.getY() - yoffset) / (float) snap) * snap) + yoffset;
                         p.setLocation(x, y);
                         //System.err.println(p);
                         currentPoints.add(p);
@@ -190,7 +198,19 @@ class DrawingPanel extends JPanel {
         return polygons.size();
     }
 
-    public void saveToFile() {
+    private WorldPoint panel2World(Point p) {
+        float x = xAxis[0] + ((float) (p.getX() - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
+        float y = yAxis[0] + ((float) (getHeight() - p.getY() - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
+        return new WorldPoint(x, y);
+    }
+    
+    private WorldPoint panel2World(int px, int py) {
+        float x = xAxis[0] + ((float) (px - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
+        float y = yAxis[0] + ((float) (getHeight() - py - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
+        return new WorldPoint(x, y);
+    }
+
+    public void exportToPoly() {
         JFileChooser chooser = new JFileChooser();
         int option = chooser.showSaveDialog(this);
         if (option == JFileChooser.APPROVE_OPTION) {
@@ -208,10 +228,8 @@ class DrawingPanel extends JPanel {
                 writer.write(l.size() + " 2 0 0");
                 writer.newLine();
                 for (int i = 0; i < l.size(); i++) {
-                    Point p = l.get(i);
-                    float x = xAxis[0] + ((float) (p.getX() - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
-                    float y = yAxis[0] + ((float) (getHeight() - p.getY() - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
-                    writer.write(" " + i + " " + x + " " + y);
+                    WorldPoint p = panel2World(l.get(i));
+                    writer.write(" " + i + " " + p.x + " " + p.y);
                     writer.newLine();
                 }
                 writer.write(nseg + " 0\n");
@@ -233,7 +251,41 @@ class DrawingPanel extends JPanel {
                 writer.write(polygons.size() + "\n");
                 for (int i = 0; i < polygons.size(); i++) {
                     Rectangle r = polygons.get(i).getBounds();
-                    writer.write(i + " " + r.getCenterX() + " " + (getHeight() - r.getCenterY()) + " " + (i + 1) + "\n");
+                    WorldPoint p = panel2World((int)r.getCenterX(),(int)r.getCenterY());
+                    writer.write(i + " " + p.x + " " + p.y + " " + (i + 1) + "\n");
+                }
+                JOptionPane.showMessageDialog(this, "Saved!");
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
+            }
+        }
+    }
+
+    public void saveToFile() {
+        JFileChooser chooser = new JFileChooser();
+        int option = chooser.showSaveDialog(this);
+        if (option == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+                Set<Point> v = new HashSet<>();
+                for (Polygon p : polygons) {
+                    for (int i = 0; i < p.npoints; i++) {
+                        v.add(new Point(p.xpoints[i], p.ypoints[i]));
+                    }
+                }
+                ArrayList<Point> l = new ArrayList<>(v);
+                writer.write(l.size() + " " + xAxis[0] + " " + xAxis[1] + " " + yAxis[0] + " " + yAxis[1] + "\n");
+                for (int i = 0; i < l.size(); i++) {
+                    Point p = l.get(i);
+                    writer.write(" " + p.x + " " + p.y + "\n");
+                }
+                writer.write(polygons.size() + "\n");
+                for (Polygon p : polygons) {
+                    writer.write(" " + p.npoints);
+                    for (int i = 0; i < p.npoints; i++) {
+                        writer.write(" " + l.indexOf(new Point(p.xpoints[i], p.ypoints[i])));
+                    }
+                    writer.newLine();
                 }
                 JOptionPane.showMessageDialog(this, "Saved!");
             } catch (IOException e) {
@@ -244,17 +296,44 @@ class DrawingPanel extends JPanel {
 
     public void loadFromFile() {
         JFileChooser chooser = new JFileChooser();
-        int option = chooser.showSaveDialog(this);
+        int option = chooser.showOpenDialog(this);
         if (option == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.err.println(line);
+            try (Scanner scnr = new Scanner(new FileReader(file))) {
+                scnr.useLocale(Locale.ENGLISH);
+                int nv = scnr.nextInt();
+                System.err.println("nv=" + nv);
+                xAxis[0] = (float) scnr.nextDouble();
+                xAxis[1] = (float) scnr.nextDouble();
+                yAxis[0] = (float) scnr.nextDouble();
+                yAxis[1] = (float) scnr.nextDouble();
+                System.err.println("Got header");
+                ArrayList<Point> l = new ArrayList<>(nv);
+                for (int i = 0; i < nv; i++) {
+                    int x = scnr.nextInt();
+                    int y = scnr.nextInt();
+                    l.add(new Point(x, y));
                 }
-                JOptionPane.showMessageDialog(this, "Saved!");
-            } catch (IOException e) {
-                JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
+                System.err.println("Got " + nv + " vertices");
+                int np = scnr.nextInt();
+                System.err.println("To read " + np + " polygons");
+                ArrayList<Polygon> polys = new ArrayList<>(np);
+                for (int i = 0; i < np; i++) {
+                    nv = scnr.nextInt();
+                    Polygon pol = new Polygon();
+                    for (int v = 0; v < nv; v++) {
+                        Point p = l.get(scnr.nextInt());
+                        pol.addPoint(p.x, p.y);
+                    }
+                    polys.add(pol);
+                }
+                polygons.clear();
+                polygons.addAll(polys);
+                System.err.println("Got " + polygons.size() + " polygons");
+                repaint();
+                JOptionPane.showMessageDialog(this, "Read!");
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, "Read error: " + e.getClass() + ": " + e.getMessage());
             }
         }
     }
@@ -290,6 +369,17 @@ class DrawingPanel extends JPanel {
             Point p1 = currentPoints.get(i);
             Point p2 = currentPoints.get(i + 1);
             g2.drawLine(p1.x, p1.y, p2.x, p2.y);
+        }
+    }
+
+    class WorldPoint {
+
+        float x;
+        float y;
+
+        public WorldPoint(float x, float y) {
+            this.x = x;
+            this.y = y;
         }
     }
 }
