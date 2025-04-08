@@ -69,6 +69,38 @@ public class PolyEditor extends JFrame {
             panel.repaint();
         });
         optMenu.add(snapDecreaseItem);
+        JMenuItem xAxisItem = new JMenuItem("Scale X axis");
+        xAxisItem.addActionListener(e -> {
+            String m = JOptionPane.showInputDialog(this, "Range?", "Set range of horizontal axis", JOptionPane.QUESTION_MESSAGE);
+            try {
+                String[] w = m.trim().split("\\s+");
+                float xl = Float.parseFloat(w[0]);
+                float xh = Float.parseFloat(w[1]);
+                if (xl >= xh) {
+                    throw new IllegalArgumentException(m + "???");
+                }
+                panel.setXAxis(xl, xh);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid value, x axis not changed.", "Set range of horizontal axis", JOptionPane.QUESTION_MESSAGE);
+            }
+        });
+        optMenu.add(xAxisItem);
+        JMenuItem yAxisItem = new JMenuItem("Scale Y axis");
+        yAxisItem.addActionListener(e -> {
+            String m = JOptionPane.showInputDialog(this, "Range?", "Set range of vertical axis", JOptionPane.QUESTION_MESSAGE);
+            try {
+                String[] w = m.trim().split("\\s+");
+                float xl = Float.parseFloat(w[0]);
+                float xh = Float.parseFloat(w[1]);
+                if (xl >= xh) {
+                    throw new IllegalArgumentException(m + "???");
+                }
+                panel.setYAxis(xl, xh);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid value, y axis not changed.", "Set range of vartical axis", JOptionPane.QUESTION_MESSAGE);
+            }
+        });
+        optMenu.add(yAxisItem);
 
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
@@ -95,6 +127,16 @@ class DrawingPanel extends JPanel {
     int snap = 10;
 
     boolean remove;
+
+    public void setXAxis(float l, float h) {
+        xAxis[0] = l;
+        xAxis[1] = h;
+    }
+
+    public void setYAxis(float l, float h) {
+        yAxis[0] = l;
+        yAxis[1] = h;
+    }
 
     public DrawingPanel() {
         setBackground(Color.WHITE);
@@ -167,8 +209,8 @@ class DrawingPanel extends JPanel {
                 writer.newLine();
                 for (int i = 0; i < l.size(); i++) {
                     Point p = l.get(i);
-                    float x = xAxis[0] + ((float)(p.getX() - xoffset))/(maxw*snap)*(xAxis[1]-xAxis[0]);
-                    float y = yAxis[0] + ((float)(getHeight() - p.getY() - yoffset))/(maxh*snap)*(yAxis[1]-yAxis[0]);
+                    float x = xAxis[0] + ((float) (p.getX() - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
+                    float y = yAxis[0] + ((float) (getHeight() - p.getY() - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
                     writer.write(" " + i + " " + x + " " + y);
                     writer.newLine();
                 }
