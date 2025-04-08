@@ -152,8 +152,8 @@ class DrawingPanel extends JPanel {
                         polygons.removeIf(pol -> pol.contains(p));
                         adjustCursor();
                     } else {
-                        int x = (int) (Math.round(p.getX() / (float) snap) * snap) + xoffset;
-                        int y = (int) (Math.round(p.getY() / (float) snap) * snap) + yoffset;
+                        int x = (int) (Math.round( (p.getX()-xoffset) / (float) snap) * snap) + xoffset;
+                        int y = (int) (Math.round( (p.getY()-yoffset) / (float) snap) * snap) + yoffset;
                         p.setLocation(x, y);
                         //System.err.println(p);
                         currentPoints.add(p);
