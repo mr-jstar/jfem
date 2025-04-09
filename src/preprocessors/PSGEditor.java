@@ -5,7 +5,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -60,9 +59,26 @@ public class PSGEditor extends JFrame {
         rmItem.addActionListener(e -> {
             panel.remove = !panel.remove;
             panel.adjustCursor();
-            //((JMenuItem) e.getSource()).setText(panel.remove ? "Finish remove" : "Remove selected");
         });
         editMenu.add(rmItem);
+        Thread t = new Thread() {
+            {
+                this.setDaemon(true);
+            }
+
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        sleep(200);
+                    } catch (InterruptedException e) {
+
+                    }
+                    rmItem.setText(panel.remove ? "Finish remove" : "Remove selected");
+                }
+            }
+        };
+        t.start();
 
         JMenu optMenu = new JMenu("Options");
         JMenuItem snapEnlargeItem = new JMenuItem("Double snap size");
@@ -127,13 +143,17 @@ public class PSGEditor extends JFrame {
 class DrawingPanel extends JPanel {
 
     private final List<Polygon> polygons = new ArrayList<>();
+    private final List<Point> insidePonts = new ArrayList<>();
+    private final Set<Point> holes = new HashSet<>();
+
     private final List<Point> currentPoints = new ArrayList<>();
 
-    private float[] xAxis = {0.0f, 1.0f};
-    private float[] yAxis = {0.0f, 1.0f};
+    private final float[] xAxis = {0.0f, 1.0f};
+    private final float[] yAxis = {0.0f, 1.0f};
     int xoffset, yoffset, maxw, maxh;
 
     int snap = 10;
+    private final int iPointMarkerSie = 10;
 
     boolean remove;
 
@@ -150,6 +170,27 @@ class DrawingPanel extends JPanel {
     public DrawingPanel() {
         setBackground(Color.WHITE);
 
+        setFocusable(true); // Needed for KeyBindings
+        requestFocusInWindow();
+        // Keys -> actions
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "sPressed");
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK), "SPressed");
+
+        getActionMap().put("SPressed", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                snap *= 2;
+                repaint();
+            }
+        });
+        getActionMap().put("sPressed", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                snap /= 2;
+                repaint();
+            }
+        });
+
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
@@ -158,14 +199,32 @@ class DrawingPanel extends JPanel {
                     Point p = e.getPoint();
                     //System.err.print(p + " -> ");
                     if (remove) {
-                        polygons.removeIf(pol -> pol.contains(p));
+                        int i = insidePointClicked(p);
+                        if (i != -1) {
+                            if (holes.contains(insidePonts.get(i))) {
+                                holes.remove(insidePonts.get(i));
+                            }
+                            insidePonts.remove(i);
+                            polygons.remove(i);
+                        }
                         adjustCursor();
                     } else {
-                        int x = (int) (Math.round((p.getX() - xoffset) / (float) snap) * snap) + xoffset;
-                        int y = (int) (Math.round((p.getY() - yoffset) / (float) snap) * snap) + yoffset;
-                        p.setLocation(x, y);
-                        //System.err.println(p);
-                        currentPoints.add(p);
+                        if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
+                            int i = insidePointClicked(p);
+                            if (i != -1) {
+                                if (holes.contains(insidePonts.get(i))) {
+                                    holes.remove(insidePonts.get(i));
+                                } else {
+                                    holes.add(insidePonts.get(i));
+                                }
+                            }
+                        } else {
+                            int x = (int) (Math.round((p.getX() - xoffset) / (float) snap) * snap) + xoffset;
+                            int y = (int) (Math.round((p.getY() - yoffset) / (float) snap) * snap) + yoffset;
+                            p.setLocation(x, y);
+                            //System.err.println(p);
+                            currentPoints.add(p);
+                        }
                     }
                     repaint();
                 } // Right - add polygon
@@ -175,11 +234,29 @@ class DrawingPanel extends JPanel {
                         p.addPoint(point.x, point.y);
                     }
                     polygons.add(p);
+                    insidePonts.add(getPointIside(p));
                     currentPoints.clear();
                     repaint();
                 }
             }
-        });
+        }
+        );
+    }
+
+    private Point getPointIside(Polygon p) {
+        int cx = (int) ((p.xpoints[0] * 95. + p.xpoints[2] * 5.) / 100.);
+        int cy = (int) ((p.ypoints[0] * 95. + p.ypoints[2] * 5.) / 100.);
+        return new Point(cx, cy);
+    }
+
+    private int insidePointClicked(Point p) {
+        for (int i = 0; i < insidePonts.size(); i++) {
+            Point ip = insidePonts.get(i);
+            if (Math.sqrt((p.x - ip.x) * (p.x - ip.x) + (p.y - ip.y) * (p.y - ip.y)) < snap) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public void adjustCursor() {
@@ -191,6 +268,8 @@ class DrawingPanel extends JPanel {
 
     public void clearAllPolygons() {
         polygons.clear();
+        insidePonts.clear();
+        holes.clear();
         currentPoints.clear();
         repaint();
     }
@@ -202,12 +281,6 @@ class DrawingPanel extends JPanel {
     private WorldPoint panel2World(Point p) {
         float x = xAxis[0] + ((float) (p.getX() - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
         float y = yAxis[0] + ((float) (getHeight() - p.getY() - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
-        return new WorldPoint(x, y);
-    }
-    
-    private WorldPoint panel2World(int px, int py) {
-        float x = xAxis[0] + ((float) (px - xoffset)) / (maxw * snap) * (xAxis[1] - xAxis[0]);
-        float y = yAxis[0] + ((float) (getHeight() - py - yoffset)) / (maxh * snap) * (yAxis[1] - yAxis[0]);
         return new WorldPoint(x, y);
     }
 
@@ -236,7 +309,6 @@ class DrawingPanel extends JPanel {
                 writer.write(nseg + " 0\n");
                 int seg = 0;
                 for (Polygon p : polygons) {
-                    StringBuilder sb = new StringBuilder();
                     Point f = new Point(p.xpoints[0], p.ypoints[0]);
                     int fi = l.indexOf(f);
                     for (int i = 1; i < p.npoints; i++) {
@@ -249,13 +321,22 @@ class DrawingPanel extends JPanel {
                     writer.write(" " + seg + " " + fi + " " + l.indexOf(new Point(p.xpoints[0], p.ypoints[0])) + " 0\n");
                     seg++;
                 }
-                writer.write("0\n");
-                writer.write(polygons.size() + "\n");
+                writer.write(holes.size() + "\n");
+                int hi = 0;
+                for (Point h : holes) {
+                    WorldPoint c = panel2World(h);
+                    writer.write(hi + " " + c.x + " " + c.y + "\n");
+                    hi++;
+                }
+                writer.write((polygons.size()-holes.size()) + "\n");
+                hi= 0;
                 for (int i = 0; i < polygons.size(); i++) {
-                    int cx = Arrays.stream( polygons.get(i).xpoints ).sum() / polygons.get(i).xpoints.length;
-                    int cy = Arrays.stream( polygons.get(i).ypoints ).sum() / polygons.get(i).ypoints.length;
-                    WorldPoint c = panel2World(new Point( cx, cy));
-                    writer.write(i + " " + c.x + " " + c.y + " " + (i + 1) + "\n");
+                    Point pi = insidePonts.get(i);
+                    if (!holes.contains(pi)) {
+                        WorldPoint c = panel2World(pi);
+                        writer.write(hi + " " + c.x + " " + c.y + " " + (hi + 1) + "\n");
+                        hi++;
+                    }
                 }
                 JOptionPane.showMessageDialog(this, file.getName() + " saved!");
             } catch (IOException e) {
@@ -290,7 +371,7 @@ class DrawingPanel extends JPanel {
                     }
                     writer.newLine();
                 }
-                JOptionPane.showMessageDialog(this, file.getAbsolutePath() + " saved!");
+                JOptionPane.showMessageDialog(this, file.getName() + " saved!");
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
             }
@@ -332,6 +413,10 @@ class DrawingPanel extends JPanel {
                 }
                 polygons.clear();
                 polygons.addAll(polys);
+                insidePonts.clear();
+                for (Polygon p : polygons) {
+                    insidePonts.add(getPointIside(p));
+                }
                 //System.err.println("Got " + polygons.size() + " polygons");
                 repaint();
             } catch (Exception e) {
@@ -346,19 +431,19 @@ class DrawingPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
 
         // Draw the snap grid
-        int l = 230;
+        int l = 210;
         float[] dashPattern = {1f, 2f}; // 1px dot, 2px white
         Stroke dashed = new BasicStroke(
-            1f,                      
-            BasicStroke.CAP_BUTT,   
-            BasicStroke.JOIN_MITER, 
-            10f,                  
-            dashPattern,           
-            0f                    
+                1f,
+                BasicStroke.CAP_BUTT,
+                BasicStroke.JOIN_MITER,
+                10f,
+                dashPattern,
+                0f
         );
         Stroke strokeBackup = g2.getStroke();
         g2.setStroke(dashed);
-        g2.setColor(new Color(l,l,l));
+        g2.setColor(new Color(l, l, l));
         int width = getWidth(), height = getHeight();
         maxw = width / snap - 1;
         xoffset = (width - maxw * snap) / 2;
@@ -379,6 +464,16 @@ class DrawingPanel extends JPanel {
             g2.drawPolygon(p);
         }
         g2.setStroke(strokeBackup);
+
+        g2.setColor(Color.BLUE);
+        for (Point p : insidePonts) {
+            g2.fillOval(p.x - iPointMarkerSie / 2, p.y - iPointMarkerSie / 2, iPointMarkerSie, iPointMarkerSie);
+        }
+
+        g2.setColor(Color.ORANGE);
+        for (Point p : holes) {
+            g2.fillOval(p.x - iPointMarkerSie / 2, p.y - iPointMarkerSie / 2, iPointMarkerSie, iPointMarkerSie);
+        }
 
         // Draw with RED color while creating
         g2.setColor(Color.RED);
