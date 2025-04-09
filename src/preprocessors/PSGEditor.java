@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -15,12 +16,12 @@ import java.util.Set;
  *
  * @author jstar
  */
-public class PolyEditor extends JFrame {
+public class PSGEditor extends JFrame {
 
     private DrawingPanel panel;
 
-    public PolyEditor() {
-        setTitle("Poly File Editor");
+    public PSGEditor() {
+        setTitle("Planar Straight Graph Editor");
         setSize(800, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -119,7 +120,7 @@ public class PolyEditor extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(PolyEditor::new);
+        SwingUtilities.invokeLater(PSGEditor::new);
     }
 }
 
@@ -246,15 +247,17 @@ class DrawingPanel extends JPanel {
                         seg++;
                     }
                     writer.write(" " + seg + " " + fi + " " + l.indexOf(new Point(p.xpoints[0], p.ypoints[0])) + " 0\n");
+                    seg++;
                 }
                 writer.write("0\n");
                 writer.write(polygons.size() + "\n");
                 for (int i = 0; i < polygons.size(); i++) {
-                    Rectangle r = polygons.get(i).getBounds();
-                    WorldPoint p = panel2World((int)r.getCenterX(),(int)r.getCenterY());
-                    writer.write(i + " " + p.x + " " + p.y + " " + (i + 1) + "\n");
+                    int cx = Arrays.stream( polygons.get(i).xpoints ).sum() / polygons.get(i).xpoints.length;
+                    int cy = Arrays.stream( polygons.get(i).ypoints ).sum() / polygons.get(i).ypoints.length;
+                    WorldPoint c = panel2World(new Point( cx, cy));
+                    writer.write(i + " " + c.x + " " + c.y + " " + (i + 1) + "\n");
                 }
-                JOptionPane.showMessageDialog(this, "Saved!");
+                JOptionPane.showMessageDialog(this, file.getName() + " saved!");
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
             }
@@ -287,7 +290,7 @@ class DrawingPanel extends JPanel {
                     }
                     writer.newLine();
                 }
-                JOptionPane.showMessageDialog(this, "Saved!");
+                JOptionPane.showMessageDialog(this, file.getAbsolutePath() + " saved!");
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
             }
@@ -302,21 +305,21 @@ class DrawingPanel extends JPanel {
             try (Scanner scnr = new Scanner(new FileReader(file))) {
                 scnr.useLocale(Locale.ENGLISH);
                 int nv = scnr.nextInt();
-                System.err.println("nv=" + nv);
+                //System.err.println("nv=" + nv);
                 xAxis[0] = (float) scnr.nextDouble();
                 xAxis[1] = (float) scnr.nextDouble();
                 yAxis[0] = (float) scnr.nextDouble();
                 yAxis[1] = (float) scnr.nextDouble();
-                System.err.println("Got header");
+                //System.err.println("Got header");
                 ArrayList<Point> l = new ArrayList<>(nv);
                 for (int i = 0; i < nv; i++) {
                     int x = scnr.nextInt();
                     int y = scnr.nextInt();
                     l.add(new Point(x, y));
                 }
-                System.err.println("Got " + nv + " vertices");
+                //System.err.println("Got " + nv + " vertices");
                 int np = scnr.nextInt();
-                System.err.println("To read " + np + " polygons");
+                //System.err.println("To read " + np + " polygons");
                 ArrayList<Polygon> polys = new ArrayList<>(np);
                 for (int i = 0; i < np; i++) {
                     nv = scnr.nextInt();
@@ -329,9 +332,8 @@ class DrawingPanel extends JPanel {
                 }
                 polygons.clear();
                 polygons.addAll(polys);
-                System.err.println("Got " + polygons.size() + " polygons");
+                //System.err.println("Got " + polygons.size() + " polygons");
                 repaint();
-                JOptionPane.showMessageDialog(this, "Read!");
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Read error: " + e.getClass() + ": " + e.getMessage());
             }
@@ -344,7 +346,19 @@ class DrawingPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
 
         // Draw the snap grid
-        g2.setColor(Color.LIGHT_GRAY);
+        int l = 230;
+        float[] dashPattern = {1f, 2f}; // 1px dot, 2px white
+        Stroke dashed = new BasicStroke(
+            1f,                      
+            BasicStroke.CAP_BUTT,   
+            BasicStroke.JOIN_MITER, 
+            10f,                  
+            dashPattern,           
+            0f                    
+        );
+        Stroke strokeBackup = g2.getStroke();
+        g2.setStroke(dashed);
+        g2.setColor(new Color(l,l,l));
         int width = getWidth(), height = getHeight();
         maxw = width / snap - 1;
         xoffset = (width - maxw * snap) / 2;
@@ -356,14 +370,17 @@ class DrawingPanel extends JPanel {
         for (int i = 0; i <= maxh; i++) {
             g2.drawLine(xoffset, yoffset + (i * snap), width - xoffset, yoffset + (i * snap));
         }
+        g2.setStroke(strokeBackup);
 
-        // Draw with BLUE already created
+        // Draw with BLUE already created polygons
         g2.setColor(Color.BLUE);
+        g2.setStroke(new BasicStroke(1.5f));
         for (Polygon p : polygons) {
             g2.drawPolygon(p);
         }
+        g2.setStroke(strokeBackup);
 
-        // Draw with RED color while crating
+        // Draw with RED color while creating
         g2.setColor(Color.RED);
         for (int i = 0; i < currentPoints.size() - 1; i++) {
             Point p1 = currentPoints.get(i);
