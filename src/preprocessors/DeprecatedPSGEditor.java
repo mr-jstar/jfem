@@ -15,17 +15,17 @@ import java.util.Set;
  *
  * @author jstar
  */
-public class PSGEditor extends JFrame {
+public class DeprecatedPSGEditor extends JFrame {
 
-    private DrawingPanel panel;
+    private MyDrawingPanel panel;
 
-    public PSGEditor() {
+    public DeprecatedPSGEditor() {
         setTitle("Planar Straight Graph Editor");
         setSize(800, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        panel = new DrawingPanel();
+        panel = new MyDrawingPanel();
         add(panel);
 
         JMenuBar menuBar = new JMenuBar();
@@ -136,11 +136,11 @@ public class PSGEditor extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(PSGEditor::new);
+        SwingUtilities.invokeLater(DeprecatedPSGEditor::new);
     }
 }
 
-class DrawingPanel extends JPanel {
+class MyDrawingPanel extends JPanel {
 
     private final List<Polygon> polygons = new ArrayList<>();
     private final List<Point> insidePonts = new ArrayList<>();
@@ -167,7 +167,7 @@ class DrawingPanel extends JPanel {
         yAxis[1] = h;
     }
 
-    public DrawingPanel() {
+    public MyDrawingPanel() {
         setBackground(Color.WHITE);
 
         setFocusable(true); // Needed for KeyBindings

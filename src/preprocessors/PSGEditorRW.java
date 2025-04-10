@@ -18,6 +18,13 @@ import java.util.Set;
 public class PSGEditorRW extends JFrame {
 
     private DrawingPanel panel;
+    private final boolean printDiag = false;
+
+    private static final Font FONT12 = new Font("SansSerif", Font.PLAIN, 12);
+    private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
+    private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
+    private final Font[] fonts = {FONT12, FONT18, FONT24};
+    private static Font currentFont = FONT24;
 
     public PSGEditorRW() {
         setTitle("Planar Straight Graph Editor");
@@ -42,6 +49,11 @@ public class PSGEditorRW extends JFrame {
         JMenuItem exportItem = new JMenuItem("Export to .poly");
         exportItem.addActionListener(e -> panel.exportToPoly());
         fileMenu.add(exportItem);
+
+        fileMenu.addSeparator();
+        JMenuItem cmdItem = new JMenuItem("Run posprocessor");
+        cmdItem.addActionListener(e -> runPosproc());
+        fileMenu.add(cmdItem);
 
         fileMenu.addSeparator();
         JMenuItem exitItem = new JMenuItem("Exit");
@@ -132,7 +144,55 @@ public class PSGEditorRW extends JFrame {
         menuBar.add(optMenu);
         setJMenuBar(menuBar);
 
+        setFontRecursively(this, currentFont, 0);
         setVisible(true);
+    }
+
+    private void runPosproc() {
+        try {
+            String processor = "/usr/bin/triangle";
+            String switches = "-pAqa" + String.format(Locale.ENGLISH,"%.6f", panel.hSquare);
+            System.err.println( processor + " " + switches + " " + panel.lastPolyFile);
+            ProcessBuilder builder = new ProcessBuilder(processor, switches, panel.lastPolyFile);
+            if( builder == null )
+                throw new IllegalStateException("Can't create process builder: \"" + processor + " " + switches + "\"");
+            Process process = builder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(">> " + line);
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Exception: " + e.getClass() + " " + e.getMessage());
+        }
+    }
+
+    // Helper - changes fonts of all components
+    private void setFontRecursively(Component comp, Font font, int level) {
+        if (comp == null) {
+            return;
+        }
+        comp.setFont(font);
+        // Diagnostics
+        if (printDiag) {
+            for (int i = 0; i < level; i++) {
+                System.err.print("\t");
+            }
+            System.err.println(comp.getClass().getName() + " : " + (comp instanceof Container ? ("container (" + ((Container) comp).getComponentCount() + ")") : "other"));
+        }
+        //
+        if (comp instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                setFontRecursively(child, font, level + 1);
+            }
+        }
+        // Needs specific navigation, since JMenu does not show menu components as Components
+        if (comp instanceof JMenu menu) {
+            for (int i = 0; i < menu.getItemCount(); i++) {
+                setFontRecursively(menu.getItem(i), font, level + 1);
+            }
+        }
     }
 
     public static void main(String[] args) {
@@ -155,13 +215,16 @@ class DrawingPanel extends JPanel {
 
     private final float[] xAxis = {0.0f, 1.0f};
     private final float[] yAxis = {0.0f, 1.0f};
+
     int xoffset, yoffset, maxw, maxh;
+    float hSquare;
+    String lastPolyFile;
 
     private void rebuildViews() {
-       // System.err.println("#V:  " + vertices.size()
-       //         + " #P:  " + polygons.size()
-       //         + " #H:  " + holes.size()
-       // );
+        // System.err.println("#V:  " + vertices.size()
+        //         + " #P:  " + polygons.size()
+        //         + " #H:  " + holes.size()
+        // );
         vertexViews.clear();
         for (WorldPoint wp : vertices) {
             vertexViews.add(world2Panel(wp));
@@ -406,6 +469,7 @@ class DrawingPanel extends JPanel {
                     writer.write(i + " " + c.x + " " + c.y + " " + (i + 1) + "\n");
                 }
                 JOptionPane.showMessageDialog(this, file.getName() + " saved!");
+                lastPolyFile = file.getAbsolutePath();
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(this, "Write error: " + e.getMessage());
             }
@@ -418,15 +482,15 @@ class DrawingPanel extends JPanel {
         if (option == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-                writer.write(xAxis[0] + " " + xAxis[1] + " " + yAxis[0] + " " + yAxis[1] + " " +"\n");
+                writer.write(xAxis[0] + " " + xAxis[1] + " " + yAxis[0] + " " + yAxis[1] + " " + "\n");
                 writer.write(vertices.size() + "\n");
-                for (WorldPoint p : vertices ) {
+                for (WorldPoint p : vertices) {
                     writer.write(" " + p.x + " " + p.y + "\n");
                 }
                 writer.write(polygons.size() + "\n");
                 for (List<Integer> p : polygons) {
                     writer.write(" " + p.size());
-                    for (Integer i : p ) {
+                    for (Integer i : p) {
                         writer.write(" " + i);
                     }
                     writer.newLine();
@@ -434,7 +498,7 @@ class DrawingPanel extends JPanel {
                 writer.write(holes.size() + "\n");
                 for (List<Integer> p : holes) {
                     writer.write(" " + p.size());
-                    for (Integer i : p ) {
+                    for (Integer i : p) {
                         writer.write(" " + i);
                     }
                     writer.newLine();
@@ -453,7 +517,7 @@ class DrawingPanel extends JPanel {
             File file = chooser.getSelectedFile();
             try (Scanner scnr = new Scanner(new FileReader(file))) {
                 scnr.useLocale(Locale.ENGLISH);
-     
+
                 xAxis[0] = (float) scnr.nextDouble();
                 xAxis[1] = (float) scnr.nextDouble();
                 yAxis[0] = (float) scnr.nextDouble();
@@ -475,7 +539,7 @@ class DrawingPanel extends JPanel {
                     nv = scnr.nextInt();
                     List<Integer> pol = new ArrayList<>();
                     for (int v = 0; v < nv; v++) {
-                        pol.add( scnr.nextInt() );
+                        pol.add(scnr.nextInt());
                     }
                     polygons.add(pol);
                 }
@@ -486,7 +550,7 @@ class DrawingPanel extends JPanel {
                     nv = scnr.nextInt();
                     List<Integer> pol = new ArrayList<>();
                     for (int v = 0; v < nv; v++) {
-                        pol.add( scnr.nextInt() );
+                        pol.add(scnr.nextInt());
                     }
                     holes.add(pol);
                 }
@@ -521,6 +585,7 @@ class DrawingPanel extends JPanel {
         xoffset = (width - maxw * snap) / 2;
         maxh = height / snap - 1;
         yoffset = (height - maxh * snap) / 2;
+        hSquare = ((xAxis[1] - xAxis[0]) / maxw) * ((xAxis[1] - xAxis[0]) / maxw);
         for (int i = 0; i <= maxw; i++) {
             g2.drawLine(xoffset + (i * snap), yoffset, xoffset + (i * snap), height - yoffset);
         }
