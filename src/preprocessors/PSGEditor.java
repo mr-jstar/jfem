@@ -67,7 +67,7 @@ public class PSGEditor extends JFrame {
         fileMenu.add(exportItem);
 
         fileMenu.addSeparator();
-        JMenuItem cmdItem = new JMenuItem("Run posprocessor");
+        JMenuItem cmdItem = new JMenuItem("Run generator");
         cmdItem.addActionListener(e -> runPostproc());
         fileMenu.add(cmdItem);
 
