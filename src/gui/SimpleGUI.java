@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import miscutils.FontFactory;
 import miscutils.MiscUtils;
 import sm.solvers.GMRES;
 
@@ -31,12 +32,9 @@ import sm.solvers.GMRES;
  */
 public class SimpleGUI extends JFrame {
 
-    private static final Font FONT12 = new Font("SansSerif", Font.PLAIN, 12);
-    private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
-    private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
-
-    private final Font[] fonts = {FONT12, FONT18, FONT24};
-    private static Font currentFont = FONT18;
+    private static final int[] sizes = {12,18,24};
+    private static final Font[] fonts = FontFactory.makeFonts("SansSerif", Font.PLAIN,sizes);
+    private static Font currentFont = fonts[fonts.length/2];
 
     private static final String CONFIG_FILE = ".femconfig";
 

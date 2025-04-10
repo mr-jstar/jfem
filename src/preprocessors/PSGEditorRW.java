@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.Set;
+import miscutils.FontFactory;
 
 /**
  *
@@ -20,18 +21,15 @@ public class PSGEditorRW extends JFrame {
     private DrawingPanel panel;
     private final boolean printDiag = false;
 
-    private static final Font FONT12 = new Font("SansSerif", Font.PLAIN, 12);
-    private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
-    private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
-    private final Font[] fonts = {FONT12, FONT18, FONT24};
-    private static Font currentFont = FONT18;
+    private static final Font[] fonts = FontFactory.makeFonts("SansSerif");
+    private static Font currentFont = fonts[fonts.length / 2];
 
     private String processorCommand = "/usr/bin/triangle";
-    private String processorSwitches = "-pAqa";
+    private String processorSwitches = "-pAqa0.1";
 
     public PSGEditorRW() {
         setTitle("Planar Straight Graph Editor");
-        setSize(800, 600);
+        setSize(1200, 1200);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
@@ -102,6 +100,7 @@ public class PSGEditorRW extends JFrame {
                     throw new IllegalArgumentException(m + "???");
                 }
                 panel.setXAxis(xl, xh);
+                panel.repaint();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Invalid value, x axis not changed.", "Set range of horizontal axis", JOptionPane.QUESTION_MESSAGE);
             }
@@ -118,6 +117,7 @@ public class PSGEditorRW extends JFrame {
                     throw new IllegalArgumentException(m + "???");
                 }
                 panel.setYAxis(xl, xh);
+                panel.repaint();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Invalid value, y axis not changed.", "Set range of vartical axis", JOptionPane.QUESTION_MESSAGE);
             }
@@ -135,6 +135,7 @@ public class PSGEditorRW extends JFrame {
                 setFontRecursively(this, currentFont, 0);
                 UIManager.put("OptionPane.messageFont", currentFont);
                 UIManager.put("OptionPane.buttonFont", currentFont);
+                UIManager.put("TextField.font", currentFont);
             });
             fontOpt.setSelected(f == currentFont);
             fgroup.add(fontOpt);
@@ -209,10 +210,35 @@ public class PSGEditorRW extends JFrame {
             Process process = builder.start();
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                System.out.println(">> " + line);
-            }
+
+            Thread out = new Thread() {
+                public void run() {
+                    JFrame postProcOutput = new JFrame("Postprocessor output");
+                    postProcOutput.setSize(600, 800);
+                    postProcOutput.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+                    JTextArea put = new JTextArea();
+                    put.setEditable(false);
+                    put.setText("");
+
+                    JScrollPane scrollPane = new JScrollPane(put);
+
+                    postProcOutput.getContentPane().add(scrollPane);
+                    postProcOutput.setLocationRelativeTo(PSGEditorRW.this);
+                    setFontRecursively(postProcOutput, currentFont, 0);
+                    postProcOutput.setVisible(true);
+                    String line;
+                    try {
+                        while ((line = reader.readLine()) != null) {
+                            put.setText(put.getText() + "\n>> " + line);
+                          }
+                    } catch (IOException e) {
+
+                    }
+                }
+            };
+            out.start();
+
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Exception: " + e.getClass() + " " + e.getMessage());
         }
@@ -313,6 +339,7 @@ class DrawingPanel extends JPanel {
 
     int snap = 10;
     private final int iPointMarkerSize = 10;
+    int gridBrightness = 210;
 
     boolean remove;
 
@@ -324,6 +351,8 @@ class DrawingPanel extends JPanel {
         // Keys -> actions
         getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "sPressed");
         getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.SHIFT_DOWN_MASK), "SPressed");
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_B, InputEvent.SHIFT_DOWN_MASK), "BPressed");
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_B, 0), "bPressed");
 
         getActionMap().put("SPressed", new AbstractAction() {
             @Override
@@ -337,8 +366,26 @@ class DrawingPanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 if (snap >= 5) {
                     snap /= 2;
+                    repaint();
                 }
-                repaint();
+            }
+        });
+        getActionMap().put("bPressed", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gridBrightness > 0) {
+                    gridBrightness -= 10;
+                    repaint();
+                }
+            }
+        });
+        getActionMap().put("BPressed", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gridBrightness < 210) {
+                    gridBrightness += 10;
+                    repaint();
+                }
             }
         });
 
@@ -473,8 +520,9 @@ class DrawingPanel extends JPanel {
         int option = chooser.showSaveDialog(this);
         if (option == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            if (! file.getName().endsWith(".poly"))
+            if (!file.getName().endsWith(".poly")) {
                 file = new File(file.getAbsolutePath() + ".poly");
+            }
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
                 writer.write(vertices.size() + " 2 0 0");
                 writer.newLine();
@@ -619,8 +667,8 @@ class DrawingPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
 
         // Draw the snap grid
-        int l = 210;
-        float[] dashPattern = {1f, 2f}; // 1px dot, 2px white
+        int l = gridBrightness;
+        float[] dashPattern = {2f, 2f}; // 2px dot, 2px white
         Stroke dashed = new BasicStroke(
                 1f,
                 BasicStroke.CAP_BUTT,
