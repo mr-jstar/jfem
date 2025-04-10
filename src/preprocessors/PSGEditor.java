@@ -16,7 +16,7 @@ import miscutils.FontFactory;
  *
  * @author jstar
  */
-public class PSGEditorRW extends JFrame {
+public class PSGEditor extends JFrame {
 
     private DrawingPanel panel;
     private final boolean printDiag = false;
@@ -27,7 +27,7 @@ public class PSGEditorRW extends JFrame {
     private String processorCommand = "/usr/bin/triangle";
     private String processorSwitches = "-pAqa0.1";
 
-    public PSGEditorRW() {
+    public PSGEditor() {
         setTitle("Planar Straight Graph Editor");
         setSize(1200, 1200);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -224,7 +224,7 @@ public class PSGEditorRW extends JFrame {
                     JScrollPane scrollPane = new JScrollPane(put);
 
                     postProcOutput.getContentPane().add(scrollPane);
-                    postProcOutput.setLocationRelativeTo(PSGEditorRW.this);
+                    postProcOutput.setLocationRelativeTo(PSGEditor.this);
                     setFontRecursively(postProcOutput, currentFont, 0);
                     postProcOutput.setVisible(true);
                     String line;
@@ -272,7 +272,7 @@ public class PSGEditorRW extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(PSGEditorRW::new);
+        SwingUtilities.invokeLater(PSGEditor::new);
     }
 }
 

@@ -56,6 +56,7 @@ public class SimpleGUI extends JFrame {
     private final String DEFAULT_SUB_TEXT = "Modify subdomain(s)";
 
     private final JButton loadButton = new JButton("Load mesh");
+    private final JButton psgButton = new JButton("Run PSG editor");
     private final JButton meshButton = new JButton("Draw mesh");
     private final JButton bndButton = new JButton(DEFAULT_BND_TEXT);
     private final JButton rmBndButton = new JButton("Clear DBC(s)");
@@ -68,7 +69,7 @@ public class SimpleGUI extends JFrame {
     private final JButton exitButton = new JButton("Close");
 
     private final JButton[] buttons = {
-        loadButton, meshButton, bndButton, rmBndButton,
+        psgButton, loadButton, meshButton, bndButton, rmBndButton,
         subDomButton, matsButton, computeButton, fieldButton,
         clearButton, saveButton, exitButton
     };
@@ -99,6 +100,7 @@ public class SimpleGUI extends JFrame {
             btn.setFont(currentFont);
         }
 
+        psgButton.addActionListener(e -> runPSG());
         loadButton.addActionListener(e -> loadFile());
         meshButton.addActionListener(e -> drawMesh());
         clearButton.addActionListener(e -> drawingPanel.clear());
@@ -265,6 +267,18 @@ public class SimpleGUI extends JFrame {
                 JOptionPane.showMessageDialog(this, "Unable to load mesh from: " + meshFile.getAbsolutePath());
             }
         }
+    }
+    
+        // Action for Draw mesh button/menu item
+    private void runPSG() {
+        try {
+            Class c = Class.forName("preprocessors.PSGEditor");
+            Object o = c.getConstructor().newInstance();
+            message.setText("OK");
+        } catch( Exception e ) {
+            message.setText("Can't run: " + e.getLocalizedMessage());
+        }
+        
     }
 
     // Action for Draw mesh button/menu item
