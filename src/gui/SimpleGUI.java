@@ -249,6 +249,8 @@ public class SimpleGUI extends JFrame {
                 computeMeshRange();
                 computeInitialSubdomains();
                 options.put("showMesh", false);
+                if( mesh.getNoElems() > 100 )
+                    options.put("showVertexNo", false);
                 options.put("showField", false);
                 options.put("inDefBoundary", false);
                 options.put("inDefSubdomains", false);

@@ -24,7 +24,10 @@ public class PSGEditorRW extends JFrame {
     private static final Font FONT18 = new Font("SansSerif", Font.PLAIN, 18);
     private static final Font FONT24 = new Font("SansSerif", Font.PLAIN, 24);
     private final Font[] fonts = {FONT12, FONT18, FONT24};
-    private static Font currentFont = FONT24;
+    private static Font currentFont = FONT18;
+
+    private String processorCommand = "/usr/bin/triangle";
+    private String processorSwitches = "-pAqa";
 
     public PSGEditorRW() {
         setTitle("Planar Straight Graph Editor");
@@ -52,7 +55,7 @@ public class PSGEditorRW extends JFrame {
 
         fileMenu.addSeparator();
         JMenuItem cmdItem = new JMenuItem("Run posprocessor");
-        cmdItem.addActionListener(e -> runPosproc());
+        cmdItem.addActionListener(e -> runPostproc());
         fileMenu.add(cmdItem);
 
         fileMenu.addSeparator();
@@ -73,24 +76,6 @@ public class PSGEditorRW extends JFrame {
             panel.adjustCursor();
         });
         editMenu.add(rmItem);
-        Thread t = new Thread() {
-            {
-                this.setDaemon(true);
-            }
-
-            @Override
-            public void run() {
-                while (true) {
-                    try {
-                        sleep(200);
-                    } catch (InterruptedException e) {
-
-                    }
-                    rmItem.setText(panel.remove ? "Finish remove" : "Remove selected");
-                }
-            }
-        };
-        t.start();
 
         JMenu optMenu = new JMenu("Options");
         JMenuItem snapEnlargeItem = new JMenuItem("Double snap size");
@@ -139,23 +124,88 @@ public class PSGEditorRW extends JFrame {
         });
         optMenu.add(yAxisItem);
 
+        JMenu settings = new JMenu("Settings");
+        ButtonGroup fgroup = new ButtonGroup();
+        settings.add(new JMenuItem("Font size"));
+        for (Font f : fonts) {
+            JRadioButtonMenuItem fontOpt = new JRadioButtonMenuItem("\t\t\t" + String.valueOf(f.getSize()));
+            final Font cf = f;
+            fontOpt.addActionListener(e -> {
+                currentFont = cf;
+                setFontRecursively(this, currentFont, 0);
+                UIManager.put("OptionPane.messageFont", currentFont);
+                UIManager.put("OptionPane.buttonFont", currentFont);
+            });
+            fontOpt.setSelected(f == currentFont);
+            fgroup.add(fontOpt);
+            settings.add(fontOpt);
+        }
+        settings.addSeparator();
+        JMenuItem postprocItem = new JMenuItem("Triangle command");
+        postprocItem.addActionListener(e -> {
+            try {
+                String m = JOptionPane.showInputDialog(this, "Command", "Triangle command", JOptionPane.QUESTION_MESSAGE, null, null, processorCommand).toString();
+                processorCommand = m.trim();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid value, postprocessor not changed.", "Triangle command", JOptionPane.QUESTION_MESSAGE);
+            }
+        });
+        settings.add(postprocItem);
+        JMenuItem switchesItem = new JMenuItem("Triangle switches");
+        switchesItem.addActionListener(e -> {
+            processorSwitches = "-pAqa" + String.format(Locale.ENGLISH, "%.6f", panel.hSquare);
+            try {
+                String m = JOptionPane.showInputDialog(this, "Switches", "Triangle switches", JOptionPane.QUESTION_MESSAGE, null, null, processorSwitches).toString();
+                processorSwitches = m.trim();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Invalid value, switches not changed.", "Triangle switches", JOptionPane.QUESTION_MESSAGE);
+            }
+        });
+        settings.add(switchesItem);
+
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
         menuBar.add(optMenu);
+        menuBar.add(settings);
         setJMenuBar(menuBar);
+
+        Thread t = new Thread() {
+            {
+                this.setDaemon(true);
+            }
+
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        sleep(200);
+                    } catch (InterruptedException e) {
+
+                    }
+                    saveItem.setEnabled(panel.getNoPolygons() > 0);
+                    exportItem.setEnabled(panel.getNoPolygons() > 0);
+                    cmdItem.setEnabled(panel.lastPolyFile != null);
+                    rmItem.setText(panel.remove ? "Finish remove" : "Remove selected");
+                }
+            }
+        };
+        t.start();
 
         setFontRecursively(this, currentFont, 0);
         setVisible(true);
     }
 
-    private void runPosproc() {
+    private void runPostproc() {
+        System.err.println("runPostproc");
+        if (panel.lastPolyFile == null) {
+            return;
+        }
         try {
-            String processor = "/usr/bin/triangle";
-            String switches = "-pAqa" + String.format(Locale.ENGLISH,"%.6f", panel.hSquare);
-            System.err.println( processor + " " + switches + " " + panel.lastPolyFile);
-            ProcessBuilder builder = new ProcessBuilder(processor, switches, panel.lastPolyFile);
-            if( builder == null )
-                throw new IllegalStateException("Can't create process builder: \"" + processor + " " + switches + "\"");
+            System.err.println(processorCommand + " " + processorSwitches + " " + panel.lastPolyFile);
+            ProcessBuilder builder = new ProcessBuilder(processorCommand, processorSwitches, panel.lastPolyFile);
+            if (builder == null) {
+                throw new IllegalStateException("Can't create process builder: \"" + processorCommand + " " + processorSwitches + "\"");
+            }
             Process process = builder.start();
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -423,6 +473,8 @@ class DrawingPanel extends JPanel {
         int option = chooser.showSaveDialog(this);
         if (option == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
+            if (! file.getName().endsWith(".poly"))
+                file = new File(file.getAbsolutePath() + ".poly");
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
                 writer.write(vertices.size() + " 2 0 0");
                 writer.newLine();
