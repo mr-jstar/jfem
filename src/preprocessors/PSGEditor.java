@@ -26,11 +26,26 @@ public class PSGEditor extends JFrame {
 
     private String processorCommand = "/usr/bin/triangle";
     private String processorSwitches = "-pAqa0.1";
-
+    
+    private boolean exit_on_close;
+    
+    public PSGEditor(boolean on_close) {
+        exit_on_close = on_close;
+        init();
+    } 
+    
     public PSGEditor() {
+        init();
+    } 
+
+    private void  init() {
         setTitle("Planar Straight Graph Editor");
         setSize(1200, 1200);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        
+        if( exit_on_close )
+            setDefaultCloseOperation(EXIT_ON_CLOSE);
+        else
+            setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLocationRelativeTo(null);
 
         panel = new DrawingPanel();
@@ -186,7 +201,7 @@ public class PSGEditor extends JFrame {
                     saveItem.setEnabled(panel.getNoPolygons() > 0);
                     exportItem.setEnabled(panel.getNoPolygons() > 0);
                     cmdItem.setEnabled(panel.lastPolyFile != null);
-                    rmItem.setText(panel.remove ? "Finish remove" : "Remove selected");
+                    rmItem.setText(panel.remove ? "End removing" : "Remove selected");
                 }
             }
         };
@@ -271,8 +286,12 @@ public class PSGEditor extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(PSGEditor::new);
+    public static void main(String[] args) { 
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                PSGEditor instance = new PSGEditor(true);
+            }
+        });
     }
 }
 

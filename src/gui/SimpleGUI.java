@@ -175,6 +175,7 @@ public class SimpleGUI extends JFrame {
         add(messagePanel, BorderLayout.SOUTH);
 
         switchAllButtons(false);
+        psgButton.setEnabled(true);
         loadButton.setEnabled(true);
         exitButton.setEnabled(true);
 
