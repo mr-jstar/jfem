@@ -158,10 +158,10 @@ class DrawingPanel extends JPanel {
     int xoffset, yoffset, maxw, maxh;
 
     private void rebuildViews() {
-        System.err.println("#V:  " + vertices.size()
-                + " #P:  " + polygons.size()
-                + " #H:  " + holes.size()
-        );
+       // System.err.println("#V:  " + vertices.size()
+       //         + " #P:  " + polygons.size()
+       //         + " #H:  " + holes.size()
+       // );
         vertexViews.clear();
         for (WorldPoint wp : vertices) {
             vertexViews.add(world2Panel(wp));
@@ -192,10 +192,10 @@ class DrawingPanel extends JPanel {
             holeViews.add(insidePontViews.get(i + polygons.size()));
         }
 
-        System.err.println("#Vv: " + vertexViews.size()
-                + " #Pv: " + polygonViews.size()
-                + " #Hv: " + holeViews.size()
-        );
+        //System.err.println("#Vv: " + vertexViews.size()
+        //        + " #Pv: " + polygonViews.size()
+        //        + " #Hv: " + holeViews.size()
+        //);
     }
 
     int snap = 10;
@@ -249,7 +249,7 @@ class DrawingPanel extends JPanel {
                     } else {
                         if ((e.getModifiersEx() & InputEvent.SHIFT_DOWN_MASK) != 0) {
                             int i = insidePointClicked(p);
-                            System.err.println(p + " -> " + i);
+                            //System.err.println(p + " -> " + i);
                             if (i != -1) {
                                 if (holeViews.contains(insidePontViews.get(i))) {
                                     int hi = i - polygons.size();
@@ -273,17 +273,17 @@ class DrawingPanel extends JPanel {
                     repaint();
                 } // Right - add polygon
                 else if (SwingUtilities.isRightMouseButton(e) && currentPoints.size() >= 3 && !remove) {
-                    ArrayList<Integer> p = new ArrayList<>();
+                    ArrayList<Integer> pol = new ArrayList<>();
                     for (Point point : currentPoints) {
                         int i = vertexViews.indexOf(point);
                         if (i >= 0) {
-                            p.add(i);
+                            pol.add(i);
                         } else {
                             vertices.add(panel2World(point));
-                            p.add(vertices.size() - 1);
+                            pol.add(vertices.size() - 1);
                         }
                     }
-                    polygons.add(p);
+                    polygons.add(pol);
                     currentPoints.clear();
                     repaint();
                 }
@@ -340,7 +340,7 @@ class DrawingPanel extends JPanel {
     }
 
     public int getNoPolygons() {
-        return polygonViews.size();
+        return polygons.size() + holes.size();
     }
 
     private WorldPoint panel2World(Point p) {
@@ -418,23 +418,24 @@ class DrawingPanel extends JPanel {
         if (option == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-                Set<Point> v = new HashSet<>();
-                for (Polygon p : polygonViews) {
-                    for (int i = 0; i < p.npoints; i++) {
-                        v.add(new Point(p.xpoints[i], p.ypoints[i]));
-                    }
-                }
-                ArrayList<Point> l = new ArrayList<>(v);
-                writer.write(l.size() + " " + xAxis[0] + " " + xAxis[1] + " " + yAxis[0] + " " + yAxis[1] + "\n");
-                for (int i = 0; i < l.size(); i++) {
-                    Point p = l.get(i);
+                writer.write(xAxis[0] + " " + xAxis[1] + " " + yAxis[0] + " " + yAxis[1] + " " +"\n");
+                writer.write(vertices.size() + "\n");
+                for (WorldPoint p : vertices ) {
                     writer.write(" " + p.x + " " + p.y + "\n");
                 }
-                writer.write(polygonViews.size() + "\n");
-                for (Polygon p : polygonViews) {
-                    writer.write(" " + p.npoints);
-                    for (int i = 0; i < p.npoints; i++) {
-                        writer.write(" " + l.indexOf(new Point(p.xpoints[i], p.ypoints[i])));
+                writer.write(polygons.size() + "\n");
+                for (List<Integer> p : polygons) {
+                    writer.write(" " + p.size());
+                    for (Integer i : p ) {
+                        writer.write(" " + i);
+                    }
+                    writer.newLine();
+                }
+                writer.write(holes.size() + "\n");
+                for (List<Integer> p : holes) {
+                    writer.write(" " + p.size());
+                    for (Integer i : p ) {
+                        writer.write(" " + i);
                     }
                     writer.newLine();
                 }
@@ -452,39 +453,43 @@ class DrawingPanel extends JPanel {
             File file = chooser.getSelectedFile();
             try (Scanner scnr = new Scanner(new FileReader(file))) {
                 scnr.useLocale(Locale.ENGLISH);
-                int nv = scnr.nextInt();
-                //System.err.println("nv=" + nv);
+     
                 xAxis[0] = (float) scnr.nextDouble();
                 xAxis[1] = (float) scnr.nextDouble();
                 yAxis[0] = (float) scnr.nextDouble();
                 yAxis[1] = (float) scnr.nextDouble();
                 //System.err.println("Got header");
-                ArrayList<Point> l = new ArrayList<>(nv);
+                vertices.clear();
+                int nv = scnr.nextInt();
+                //System.err.println("nv=" + nv);
                 for (int i = 0; i < nv; i++) {
-                    int x = scnr.nextInt();
-                    int y = scnr.nextInt();
-                    l.add(new Point(x, y));
+                    float x = scnr.nextFloat();
+                    float y = scnr.nextFloat();
+                    vertices.add(new WorldPoint(x, y));
                 }
                 //System.err.println("Got " + nv + " vertices");
                 int np = scnr.nextInt();
                 //System.err.println("To read " + np + " polygonViews");
-                ArrayList<Polygon> polys = new ArrayList<>(np);
+                polygons.clear();
                 for (int i = 0; i < np; i++) {
                     nv = scnr.nextInt();
-                    Polygon pol = new Polygon();
+                    List<Integer> pol = new ArrayList<>();
                     for (int v = 0; v < nv; v++) {
-                        Point p = l.get(scnr.nextInt());
-                        pol.addPoint(p.x, p.y);
+                        pol.add( scnr.nextInt() );
                     }
-                    polys.add(pol);
+                    polygons.add(pol);
                 }
-                polygonViews.clear();
-                polygonViews.addAll(polys);
-                insidePontViews.clear();
-                for (Polygon p : polygonViews) {
-                    insidePontViews.add(getPointIside(p));
+                np = scnr.nextInt();
+                //System.err.println("To read " + np + " polygonViews");
+                holes.clear();
+                for (int i = 0; i < np; i++) {
+                    nv = scnr.nextInt();
+                    List<Integer> pol = new ArrayList<>();
+                    for (int v = 0; v < nv; v++) {
+                        pol.add( scnr.nextInt() );
+                    }
+                    holes.add(pol);
                 }
-                //System.err.println("Got " + polygonViews.size() + " polygonViews");
                 repaint();
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this, "Read error: " + e.getClass() + ": " + e.getMessage());
