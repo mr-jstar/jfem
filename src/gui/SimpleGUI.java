@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import miscutils.Configuration;
 import miscutils.FontFactory;
 import miscutils.MiscUtils;
 import sm.solvers.GMRES;
@@ -32,11 +33,14 @@ import sm.solvers.GMRES;
  */
 public class SimpleGUI extends JFrame {
 
-    private static final int[] sizes = {12,18,24};
-    private static final Font[] fonts = FontFactory.makeFonts("SansSerif", Font.PLAIN,sizes);
-    private static Font currentFont = fonts[fonts.length/2];
+    private static final int[] sizes = {12, 18, 24};
+    private static final Font[] fonts = FontFactory.makeFonts("SansSerif", Font.PLAIN, sizes);
+    private static Font currentFont = fonts[fonts.length / 2];
 
     private static final String CONFIG_FILE = ".femconfig";
+
+    private final Configuration configuration = new Configuration(CONFIG_FILE);
+    private final String LAST_DIR="SimpleGUI.last.dir";
 
     private final int vSize = 2;   // radius of mesh vertex symbol
 
@@ -250,8 +254,9 @@ public class SimpleGUI extends JFrame {
                 computeMeshRange();
                 computeInitialSubdomains();
                 options.put("showMesh", false);
-                if( mesh.getNoElems() > 100 )
+                if (mesh.getNoElems() > 100) {
                     options.put("showVertexNo", false);
+                }
                 options.put("showField", false);
                 options.put("inDefBoundary", false);
                 options.put("inDefSubdomains", false);
@@ -269,17 +274,17 @@ public class SimpleGUI extends JFrame {
             }
         }
     }
-    
-        // Action for Draw mesh button/menu item
+
+    // Action for Draw mesh button/menu item
     private void runPSG() {
         try {
             Class c = Class.forName("preprocessors.PSGEditor");
             Object o = c.getConstructor().newInstance();
             message.setText("OK");
-        } catch( Exception e ) {
+        } catch (Exception e) {
             message.setText("Can't run: " + e.getLocalizedMessage());
         }
-        
+
     }
 
     // Action for Draw mesh button/menu item
@@ -604,21 +609,17 @@ public class SimpleGUI extends JFrame {
 
     // Helper - retrieves the last used directory from the config file
     private String getLastUsedDirectory() {
-        File configFile = new File(CONFIG_FILE);
-        if (configFile.exists()) {
-            try (BufferedReader br = new BufferedReader(new FileReader(configFile))) {
-                return br.readLine();
-            } catch (IOException e) {
-                message.setText(e.getLocalizedMessage());
-            }
+        String lsd = configuration.getValue(LAST_DIR);
+        if (lsd == null) {
+            lsd = ".";
         }
-        return ".";
+        return lsd;
     }
 
     // Helper - saves the last used directory
     private void saveLastUsedDirectory(String directory) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(CONFIG_FILE))) {
-            bw.write(directory);
+        try {
+            configuration.saveValue(LAST_DIR, directory);
         } catch (IOException e) {
             message.setText(e.getLocalizedMessage());
         }
