@@ -40,7 +40,7 @@ public class SimpleGUI extends JFrame {
     private static final String CONFIG_FILE = ".femconfig";
 
     private final Configuration configuration = new Configuration(CONFIG_FILE);
-    private final String LAST_DIR="SimpleGUI.last.dir";
+    private final String LAST_DIR = "SimpleGUI.last.dir";
 
     private final int vSize = 2;   // radius of mesh vertex symbol
 
@@ -73,9 +73,9 @@ public class SimpleGUI extends JFrame {
     private final JButton exitButton = new JButton("Close");
 
     private final JButton[] buttons = {
-        psgButton, loadButton, meshButton, bndButton, rmBndButton,
+        loadButton, meshButton, bndButton, rmBndButton,
         subDomButton, matsButton, computeButton, fieldButton,
-        clearButton, saveButton, exitButton
+        clearButton, saveButton, psgButton, exitButton
     };
 
     private final JLabel message;  // Used to show status messages
@@ -97,6 +97,7 @@ public class SimpleGUI extends JFrame {
 
         UIManager.put("OptionPane.messageFont", currentFont);
         UIManager.put("OptionPane.buttonFont", currentFont);
+        UIManager.put("OptionPane.messageFont", currentFont);
 
         JPanel buttonPanel = new JPanel();
 
@@ -143,6 +144,7 @@ public class SimpleGUI extends JFrame {
                 setFontRecursively(this, currentFont, 0);
                 UIManager.put("OptionPane.messageFont", currentFont);
                 UIManager.put("OptionPane.buttonFont", currentFont);
+                UIManager.put("OptionPane.messageFont", currentFont);
             });
             fontOpt.setSelected(f == currentFont);
             fgroup.add(fontOpt);
@@ -245,7 +247,7 @@ public class SimpleGUI extends JFrame {
             try {
                 if (meshFile.getAbsolutePath().endsWith(".mesh")) {
                     mesh = fem.Util.loadINRIAMesh(meshFile.getAbsolutePath());
-                } else if (meshFile.getAbsolutePath().endsWith(".ele") || meshFile.getAbsolutePath().endsWith(".node")) {
+                } else if (meshFile.getAbsolutePath().endsWith(".poly") || meshFile.getAbsolutePath().endsWith(".ele") || meshFile.getAbsolutePath().endsWith(".node")) {
                     mesh = fem.Util.loadTriangleMesh(meshFile.getAbsolutePath());
                 } else {
                     throw new IllegalArgumentException("Unknown mesh format: " + meshFile);
@@ -276,10 +278,11 @@ public class SimpleGUI extends JFrame {
     }
 
     // Action for Draw mesh button/menu item
+    @SuppressWarnings("unchecked")
     private void runPSG() {
         try {
             Class c = Class.forName("preprocessors.PSGEditor");
-            Object o = c.getConstructor().newInstance();
+            c.getConstructor().newInstance();
             message.setText("OK");
         } catch (Exception e) {
             message.setText("Can't run: " + e.getLocalizedMessage());
@@ -809,6 +812,19 @@ public class SimpleGUI extends JFrame {
                         }
                         g2.fillPolygon(evX, evY, evX.length);
                     }
+                    // The legend
+                    int lwidth = (int) (0.7 * getWidth());
+                    int lheight = 20;
+                    int bottomMargin = 20;
+                    int pxl = (int) (0.15 * getWidth());
+                    int pyl = bottomMargin;
+                    for (int i = 0; i < mesh.getNoSubdomains(); i++) {
+                        g2.setColor(subDomColors.get(i));
+                        g2.fillRect(pxl + i * lwidth / mesh.getNoSubdomains(), pyl, 2*lheight, lheight);
+                        g2.setColor(Color.BLACK);
+                        g.drawString(String.valueOf(i),pxl + i * lwidth / mesh.getNoSubdomains()+lheight/2+3, pyl+lheight-3);
+                    }
+
                 }
                 for (int e = 0; e < mesh.getNoElems(); e++) {
                     System.arraycopy(mesh.getElem(e).getVertices(), 0, ev, 0, ev.length - 1);

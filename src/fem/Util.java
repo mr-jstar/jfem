@@ -177,6 +177,7 @@ public class Util {
     }
 
     public static IMesh loadTriangleMesh(String path) throws Exception {
+        if( path.endsWith(".poly")) path = path.replaceFirst("\\.poly$", "\\.node");
         String nodeFile = path.replaceFirst("\\.ele$", ".node");
         String eleFile = path.replaceFirst("\\.node$", ".ele");
         String edgeFile = eleFile.replaceFirst("\\.ele", ".edge");

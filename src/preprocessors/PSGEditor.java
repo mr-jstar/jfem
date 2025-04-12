@@ -5,11 +5,14 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import miscutils.Configuration;
 import miscutils.FontFactory;
 
@@ -30,7 +33,7 @@ public class PSGEditor extends JFrame {
 
     private final Configuration configuration = new Configuration(CONFIG_FILE);
 
-    private String processorCommand = "/usr/bin/triangle";
+    private String processorCommand = configuration.getValue("PSGEditor.triangle");
     private String processorSwitches = "-pAqa0.1";
 
     private boolean exit_on_close;
@@ -169,6 +172,7 @@ public class PSGEditor extends JFrame {
             try {
                 String m = JOptionPane.showInputDialog(this, "Command", "Triangle command", JOptionPane.QUESTION_MESSAGE, null, null, processorCommand).toString();
                 processorCommand = m.trim();
+                configuration.saveValue("PSGEditor.triangle", processorCommand);
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Invalid value, postprocessor not changed.", "Triangle command", JOptionPane.QUESTION_MESSAGE);
             }
@@ -215,6 +219,9 @@ public class PSGEditor extends JFrame {
         t.start();
 
         setFontRecursively(this, currentFont, 0);
+        UIManager.put("OptionPane.messageFont", currentFont);
+        UIManager.put("OptionPane.buttonFont", currentFont);
+        UIManager.put("TextField.font", currentFont);
         setVisible(true);
     }
 
@@ -224,44 +231,65 @@ public class PSGEditor extends JFrame {
             return;
         }
         try {
-            System.err.println(processorCommand + " " + processorSwitches + " " + panel.lastPolyFile);
-            ProcessBuilder builder = new ProcessBuilder(processorCommand, processorSwitches, panel.lastPolyFile);
-            if (builder == null) {
-                throw new IllegalStateException("Can't create process builder: \"" + processorCommand + " " + processorSwitches + "\"");
-            }
-            builder.directory(new File(getLastUsedDirectory()));
-            Process process = builder.start();
+            JTextField dir = new JTextField(getLastUsedDirectory());
+            JTextField cmd = new JTextField(processorCommand);
+            JTextField cmdOpt = new JTextField(processorSwitches + " " + panel.lastPolyFile);
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-            Thread out = new Thread() {
-                public void run() {
-                    JFrame postProcOutput = new JFrame("Postprocessor output");
-                    postProcOutput.setSize(600, 800);
-                    postProcOutput.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-                    JTextArea put = new JTextArea();
-                    put.setEditable(false);
-                    put.setText("");
-
-                    JScrollPane scrollPane = new JScrollPane(put);
-
-                    postProcOutput.getContentPane().add(scrollPane);
-                    postProcOutput.setLocationRelativeTo(PSGEditor.this);
-                    setFontRecursively(postProcOutput, currentFont, 0);
-                    postProcOutput.setVisible(true);
-                    String line;
-                    try {
-                        while ((line = reader.readLine()) != null) {
-                            put.setText(put.getText() + "\n>> " + line);
-                        }
-                    } catch (IOException e) {
-
-                    }
-                }
+            Object[] message = {
+                "Command:", cmd,
+                "Switches:", cmdOpt,
+                "Working directory", dir
             };
-            out.start();
 
+            int option = JOptionPane.showConfirmDialog(null, message, "Run:", JOptionPane.OK_CANCEL_OPTION);
+            if (option == JOptionPane.OK_OPTION) {
+                String wrkDir = dir.getText();
+                String[] cmdToExecute = Stream.concat(Stream.of(cmd.getText()), Arrays.stream(cmdOpt.getText().trim().split("\\s+"))).toArray(String[]::new);
+
+                System.err.println(Arrays.stream(cmdToExecute).collect(Collectors.joining(" ")));
+                ProcessBuilder builder = new ProcessBuilder(cmdToExecute);
+                if (builder == null) {
+                    throw new IllegalStateException("Can't create process builder: \"" + Arrays.stream(cmdToExecute).collect(Collectors.joining(" ")) + "\"");
+                }
+                builder.directory(new File(wrkDir));
+                Process process = builder.start();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                Thread out = new Thread() {
+                    @Override
+                    public void run() {
+                        JFrame postProcOutput = new JFrame("Postprocessor output");
+                        postProcOutput.setSize(600, 800);
+                        postProcOutput.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+                        JTextArea output = new JTextArea();
+                        output.setEditable(false);
+                        output.setText("");
+
+                        JScrollPane scrollPane = new JScrollPane(output);
+                        JPanel close = new JPanel();
+                        JButton cbtn = new JButton("Close");
+                        cbtn.addActionListener(e->postProcOutput.dispose());
+                        close.add(cbtn);
+
+                        postProcOutput.getContentPane().add(scrollPane);
+                        postProcOutput.getContentPane().add(close, BorderLayout.SOUTH);
+                        postProcOutput.setLocationRelativeTo(PSGEditor.this);
+                        setFontRecursively(postProcOutput, currentFont, 0);
+                        postProcOutput.setVisible(true);
+                        String line;
+                        try {
+                            while ((line = reader.readLine()) != null) {
+                                output.setText(output.getText() + "\n>> " + line);
+                            }
+                        } catch (IOException e) {
+
+                        }
+                    }
+                };
+                out.start();
+            }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Exception: " + e.getClass() + " " + e.getMessage());
         }
