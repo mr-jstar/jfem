@@ -33,7 +33,7 @@ import sm.solvers.GMRES;
  * @author jstar
  */
 public class SimpleGUI extends JFrame {
-    
+
     private final boolean VERTICAL_LAYOUT = true;
 
     private static final int[] sizes = {12, 18, 24};
@@ -45,7 +45,7 @@ public class SimpleGUI extends JFrame {
     private final Configuration configuration = new Configuration(CONFIG_FILE);
     private final String LAST_DIR = "SimpleGUI.last.dir";
 
-    private final int vSize = 2;   // radius of mesh vertex symbol
+    private final int vSize = 4;   // radius of mesh vertex symbol
 
     private final int vertexSelectionRadius = 100;  // precision for vertex selection
 
@@ -102,8 +102,6 @@ public class SimpleGUI extends JFrame {
         UIManager.put("OptionPane.buttonFont", currentFont);
         UIManager.put("OptionPane.messageFont", currentFont);
 
-
-
         psgButton.addActionListener(e -> runPSG());
         loadButton.addActionListener(e -> loadFile());
         meshButton.addActionListener(e -> drawMesh());
@@ -116,7 +114,7 @@ public class SimpleGUI extends JFrame {
         fieldButton.addActionListener(e -> drawField());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
         exitButton.addActionListener(e -> System.exit(0));
-        
+
         JPanel buttonPanel = new JPanel();
 
         for (JButton btn : buttons) {
@@ -199,14 +197,14 @@ public class SimpleGUI extends JFrame {
         message.setFont(currentFont);
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
-        
-        if( VERTICAL_LAYOUT ) {
-            buttonPanel.setLayout(new GridLayout(buttons.length+5, 1));
+
+        if (VERTICAL_LAYOUT) {
+            buttonPanel.setLayout(new GridLayout(buttons.length + 5, 1));
             add(buttonPanel, BorderLayout.WEST);
         } else {
             add(buttonPanel, BorderLayout.NORTH);
         }
-        
+
         add(drawingPanel, BorderLayout.CENTER);
         add(messagePanel, BorderLayout.SOUTH);
 
@@ -848,11 +846,13 @@ public class SimpleGUI extends JFrame {
                     int bottomMargin = 20;
                     int pxl = (int) (0.15 * getWidth());
                     int pyl = bottomMargin;
-                    for (int i = 0; i < mesh.getNoSubdomains(); i++) {
+                    int pos = 0;
+                    for (Integer i : subDomParameters.keySet()) {
                         g2.setColor(subDomColors.get(i));
-                        g2.fillRect(pxl + i * lwidth / mesh.getNoSubdomains(), pyl, 2 * lheight, lheight);
+                        g2.fillRect(pxl + pos, pyl, 2 * lheight, lheight);
                         g2.setColor(Color.BLACK);
-                        g.drawString(String.valueOf(i), pxl + i * lwidth / mesh.getNoSubdomains() + lheight / 2 + 3, pyl + lheight - 3);
+                        g.drawString(String.valueOf(i), pxl + pos + lheight / 2 + 3, pyl + lheight - 3);
+                        pos += lwidth / mesh.getNoSubdomains();
                     }
 
                 }
@@ -871,7 +871,13 @@ public class SimpleGUI extends JFrame {
                 g.setFont(currentFont);
                 for (int v = 0; v < mesh.getNoVertices(); v++) {
                     PointPosition p = xy.get(v);
-                    g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
+                    if (options.get("inDefBoundary") && currentSelection.contains(v)) {
+                        g.setColor(Color.RED);
+                        g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
+                        g.setColor(Color.BLUE);
+                    } else {
+                        g.fillOval(p.x - vSize / 2, p.y - vSize / 2, vSize, vSize);
+                    }
                     if (options.get("showVertexNo")) {
                         if (options.get("inDefBoundary") && currentSelection.contains(v)) {
                             g.setColor(Color.RED);
