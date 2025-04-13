@@ -1,13 +1,15 @@
 /*
  * Do what you want with this file
  */
-package gui;
+package zzz_oldies;
 
 import fem.EleIntegral;
 import fem.FEM;
 import fem.TetraLaplace;
 import fem.TriangleLaplace;
 import fem.mesh.IMesh;
+import gui.ColorMap;
+import gui.MapEditorPanel;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;

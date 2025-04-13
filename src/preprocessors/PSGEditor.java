@@ -231,7 +231,7 @@ public class PSGEditor extends JFrame {
             return;
         }
         try {
-            JTextField dir = new JTextField(getLastUsedDirectory());
+            JTextField dir = new JTextField(configuration.getValue(LAST_DIR));
             JTextField cmd = new JTextField(processorCommand);
             JTextField cmdOpt = new JTextField(processorSwitches + " " + panel.lastPolyFile);
 
@@ -252,6 +252,7 @@ public class PSGEditor extends JFrame {
                     throw new IllegalStateException("Can't create process builder: \"" + Arrays.stream(cmdToExecute).collect(Collectors.joining(" ")) + "\"");
                 }
                 builder.directory(new File(wrkDir));
+                configuration.saveValue(LAST_DIR, wrkDir);
                 Process process = builder.start();
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -270,7 +271,7 @@ public class PSGEditor extends JFrame {
                         JScrollPane scrollPane = new JScrollPane(output);
                         JPanel close = new JPanel();
                         JButton cbtn = new JButton("Close");
-                        cbtn.addActionListener(e->postProcOutput.dispose());
+                        cbtn.addActionListener(e -> postProcOutput.dispose());
                         close.add(cbtn);
 
                         postProcOutput.getContentPane().add(scrollPane);
@@ -322,29 +323,8 @@ public class PSGEditor extends JFrame {
         }
     }
 
-    String getLastUsedDirectory() {
-        String lsd = configuration.getValue(LAST_DIR);
-        if (lsd == null) {
-            lsd = ".";
-        }
-        return lsd;
-    }
-
-    // Helper - saves the last used directory
-    void saveLastUsedDirectory(String directory) {
-        try {
-            configuration.saveValue(LAST_DIR, directory);
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Write error: " + e.getClass() + ": " + e.getMessage());
-        }
-    }
-
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                PSGEditor instance = new PSGEditor(true);
-            }
-        });
+        SwingUtilities.invokeLater(() -> { new PSGEditor(true);});
     }
 
     class DrawingPanel extends JPanel {
@@ -587,7 +567,7 @@ public class PSGEditor extends JFrame {
         }
 
         public void exportToPoly() {
-            JFileChooser chooser = new JFileChooser(getLastUsedDirectory());
+            JFileChooser chooser = new JFileChooser(configuration.getValue(LAST_DIR));
             int option = chooser.showSaveDialog(this);
             if (option == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
@@ -601,29 +581,23 @@ public class PSGEditor extends JFrame {
                         writer.write(" " + i + " " + vertices.get(i).x + " " + vertices.get(i).y);
                         writer.newLine();
                     }
-                    int nseg = 0;
+                    Set<Segment> segs = new HashSet<>();
                     for (List<Integer> p : polygons) {
-                        nseg += p.size();
+                        for (int i = 1; i < p.size(); i++) {
+                            segs.add(new Segment(p.get(i - 1), p.get(i)));
+                        }
+                        segs.add(new Segment(p.get(p.size() - 1), p.get(0)));
                     }
                     for (List<Integer> p : holes) {
-                        nseg += p.size();
+                        for (int i = 1; i < p.size(); i++) {
+                            segs.add(new Segment(p.get(i - 1), p.get(i)));
+                        }
+                        segs.add(new Segment(p.get(p.size() - 1), p.get(0)));
                     }
-                    writer.write(nseg + " 0\n");
+                    writer.write(segs.size() + " 0\n");
                     int seg = 0;
-                    for (List<Integer> p : polygons) {
-                        for (int i = 1; i < p.size(); i++) {
-                            writer.write(" " + seg + " " + p.get(i - 1) + " " + p.get(i) + " 0\n");
-                            seg++;
-                        }
-                        writer.write(" " + seg + " " + p.get(p.size() - 1) + " " + p.get(0) + " 0\n");
-                        seg++;
-                    }
-                    for (List<Integer> p : holes) {
-                        for (int i = 1; i < p.size(); i++) {
-                            writer.write(" " + seg + " " + p.get(i - 1) + " " + p.get(i) + " 0\n");
-                            seg++;
-                        }
-                        writer.write(" " + seg + " " + p.get(p.size() - 1) + " " + p.get(0) + " 0\n");
+                    for (Segment s : segs) {
+                        writer.write(" " + seg + " " + s.v1 + " " + s.v2 + " 0\n");
                         seg++;
                     }
                     writer.write(holes.size() + "\n");
@@ -649,7 +623,7 @@ public class PSGEditor extends JFrame {
         }
 
         public void saveToFile() {
-            JFileChooser chooser = new JFileChooser(getLastUsedDirectory());
+            JFileChooser chooser = new JFileChooser(configuration.getValue(LAST_DIR));
             int option = chooser.showSaveDialog(this);
             if (option == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
@@ -684,7 +658,7 @@ public class PSGEditor extends JFrame {
         }
 
         public void loadFromFile() {
-            JFileChooser chooser = new JFileChooser(getLastUsedDirectory());
+            JFileChooser chooser = new JFileChooser(configuration.getValue(LAST_DIR));
             int option = chooser.showOpenDialog(this);
             if (option == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
@@ -802,9 +776,36 @@ public class PSGEditor extends JFrame {
             float x;
             float y;
 
-            public WorldPoint(float x, float y) {
+            WorldPoint(float x, float y) {
                 this.x = x;
                 this.y = y;
+            }
+        }
+
+        class Segment {
+
+            int v1, v2;
+
+            Segment(int v1, int v2) {
+                if (v1 == v2) {
+                    throw new IllegalArgumentException("Segments mus have different ends");
+                }
+                this.v1 = v1 <= v2 ? v1 : v2;
+                this.v2 = v1 > v2 ? v1 : v2;
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                if (o instanceof Segment s) {
+                    return s.v1 == v1 && s.v2 == v2;
+                } else {
+                    return false;
+                }
+            }
+
+            @Override
+            public int hashCode() {
+                return 37 * v1 + 251 * v2;
             }
         }
     }

@@ -32,7 +32,9 @@ import sm.solvers.GMRES;
  *
  * @author jstar
  */
-public class VerticalGUI extends JFrame {
+public class SimpleGUI extends JFrame {
+    
+    private final boolean VERTICAL_LAYOUT = true;
 
     private static final int[] sizes = {12, 18, 24};
     private static final Font[] fonts = FontFactory.makeFonts("SansSerif", Font.PLAIN, sizes);
@@ -58,7 +60,7 @@ public class VerticalGUI extends JFrame {
     private final TreeMap<Integer, Double> bndNodes = new TreeMap<>();  // Dirichlet boundary nodes: Vertex# -> value at
 
     private final String DEFAULT_BND_TEXT = "Add DBC(s)";
-    private final String DEFAULT_SUB_TEXT = "Modify subdomain(s)";
+    private final String DEFAULT_SUB_TEXT = "Edit subdmn(s)";
 
     private final JButton loadButton = new JButton("Load mesh");
     private final JButton psgButton = new JButton("Run PSG editor");
@@ -90,7 +92,7 @@ public class VerticalGUI extends JFrame {
 
     private boolean printDiag = false;  // if true, prints some info to System.err
 
-    public VerticalGUI() {
+    public SimpleGUI() {
         setTitle("Simple Vertical FEM GUI (Swing)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1600, 1200);
@@ -100,12 +102,7 @@ public class VerticalGUI extends JFrame {
         UIManager.put("OptionPane.buttonFont", currentFont);
         UIManager.put("OptionPane.messageFont", currentFont);
 
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new GridLayout(buttons.length, 1));
 
-        for (JButton btn : buttons) {
-            btn.setFont(currentFont);
-        }
 
         psgButton.addActionListener(e -> runPSG());
         loadButton.addActionListener(e -> loadFile());
@@ -119,6 +116,8 @@ public class VerticalGUI extends JFrame {
         fieldButton.addActionListener(e -> drawField());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
         exitButton.addActionListener(e -> System.exit(0));
+        
+        JPanel buttonPanel = new JPanel();
 
         for (JButton btn : buttons) {
             buttonPanel.add(btn);
@@ -200,8 +199,14 @@ public class VerticalGUI extends JFrame {
         message.setFont(currentFont);
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
-
-        add(buttonPanel, BorderLayout.WEST);
+        
+        if( VERTICAL_LAYOUT ) {
+            buttonPanel.setLayout(new GridLayout(buttons.length+5, 1));
+            add(buttonPanel, BorderLayout.WEST);
+        } else {
+            add(buttonPanel, BorderLayout.NORTH);
+        }
+        
         add(drawingPanel, BorderLayout.CENTER);
         add(messagePanel, BorderLayout.SOUTH);
 
@@ -468,7 +473,7 @@ public class VerticalGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Subdomain(s) parameters");
             frame.setSize(400, 500);
-            frame.setLocationRelativeTo(VerticalGUI.this);
+            frame.setLocationRelativeTo(SimpleGUI.this);
 
             String[] colN = {"SubDom", "Materials", "Sources"};
 
@@ -670,7 +675,7 @@ public class VerticalGUI extends JFrame {
 
     // Starts the application
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(VerticalGUI::new);
+        SwingUtilities.invokeLater(SimpleGUI::new);
     }
 
     // All drawing implemented here
