@@ -93,7 +93,7 @@ public class SimpleGUI extends JFrame {
     private boolean printDiag = false;  // if true, prints some info to System.err
 
     public SimpleGUI() {
-        setTitle("Simple Vertical FEM GUI (Swing)");
+        setTitle("Simple FEM GUI (Swing)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1600, 1200);
         setLocationRelativeTo(null);
