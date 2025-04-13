@@ -13,6 +13,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import static java.lang.Thread.sleep;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +32,7 @@ import sm.solvers.GMRES;
  *
  * @author jstar
  */
-public class SimpleGUI extends JFrame {
+public class VerticalGUI extends JFrame {
 
     private static final int[] sizes = {12, 18, 24};
     private static final Font[] fonts = FontFactory.makeFonts("SansSerif", Font.PLAIN, sizes);
@@ -89,8 +90,8 @@ public class SimpleGUI extends JFrame {
 
     private boolean printDiag = false;  // if true, prints some info to System.err
 
-    public SimpleGUI() {
-        setTitle("Simple FEM GUI (Swing)");
+    public VerticalGUI() {
+        setTitle("Simple Vertical FEM GUI (Swing)");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1600, 1200);
         setLocationRelativeTo(null);
@@ -100,6 +101,7 @@ public class SimpleGUI extends JFrame {
         UIManager.put("OptionPane.messageFont", currentFont);
 
         JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new GridLayout(buttons.length, 1));
 
         for (JButton btn : buttons) {
             btn.setFont(currentFont);
@@ -131,7 +133,30 @@ public class SimpleGUI extends JFrame {
         options.put("inDefBoundary", false);
         options.put("inDefSubdomain", false);
 
-        menuBar.add(options(options, currentFont));
+        JMenu opts = options(options, currentFont);
+        (new Thread() {
+            {
+                this.setDaemon(true);
+            }
+
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        sleep(500);
+                    } catch (InterruptedException e) {
+
+                    }
+                    for (int i = 0; i < opts.getItemCount(); i++) {
+                        JMenuItem mi = opts.getItem(i);
+                        if (mi instanceof JCheckBoxMenuItem cb && options.containsKey(cb.getText())) {
+                            cb.setSelected(options.get(cb.getText()));
+                        }
+                    }
+                }
+            }
+        }).start();
+        menuBar.add(opts);
 
         JMenu guiOpts = new JMenu("GUI options");
         ButtonGroup fgroup = new ButtonGroup();
@@ -176,7 +201,7 @@ public class SimpleGUI extends JFrame {
         JPanel messagePanel = new JPanel();
         messagePanel.add(message);
 
-        add(buttonPanel, BorderLayout.NORTH);
+        add(buttonPanel, BorderLayout.WEST);
         add(drawingPanel, BorderLayout.CENTER);
         add(messagePanel, BorderLayout.SOUTH);
 
@@ -443,7 +468,7 @@ public class SimpleGUI extends JFrame {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Subdomain(s) parameters");
             frame.setSize(400, 500);
-            frame.setLocationRelativeTo(SimpleGUI.this);
+            frame.setLocationRelativeTo(VerticalGUI.this);
 
             String[] colN = {"SubDom", "Materials", "Sources"};
 
@@ -645,7 +670,7 @@ public class SimpleGUI extends JFrame {
 
     // Starts the application
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(SimpleGUI::new);
+        SwingUtilities.invokeLater(VerticalGUI::new);
     }
 
     // All drawing implemented here
@@ -820,9 +845,9 @@ public class SimpleGUI extends JFrame {
                     int pyl = bottomMargin;
                     for (int i = 0; i < mesh.getNoSubdomains(); i++) {
                         g2.setColor(subDomColors.get(i));
-                        g2.fillRect(pxl + i * lwidth / mesh.getNoSubdomains(), pyl, 2*lheight, lheight);
+                        g2.fillRect(pxl + i * lwidth / mesh.getNoSubdomains(), pyl, 2 * lheight, lheight);
                         g2.setColor(Color.BLACK);
-                        g.drawString(String.valueOf(i),pxl + i * lwidth / mesh.getNoSubdomains()+lheight/2+3, pyl+lheight-3);
+                        g.drawString(String.valueOf(i), pxl + i * lwidth / mesh.getNoSubdomains() + lheight / 2 + 3, pyl + lheight - 3);
                     }
 
                 }
