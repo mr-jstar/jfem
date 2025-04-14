@@ -196,7 +196,7 @@ public class PSGEditor extends JFrame {
         menuBar.add(settings);
         setJMenuBar(menuBar);
 
-        Thread t = new Thread() {
+        (new Thread() {
             {
                 this.setDaemon(true);
             }
@@ -215,8 +215,7 @@ public class PSGEditor extends JFrame {
                     rmItem.setText(panel.remove ? "End removing" : "Remove selected");
                 }
             }
-        };
-        t.start();
+        }).start();
 
         setFontRecursively(this, currentFont, 0);
         UIManager.put("OptionPane.messageFont", currentFont);
@@ -257,7 +256,7 @@ public class PSGEditor extends JFrame {
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
-                Thread out = new Thread() {
+                SwingUtilities.invokeLater(new Thread() {
                     @Override
                     public void run() {
                         JFrame postProcOutput = new JFrame("Postprocessor output");
@@ -288,8 +287,7 @@ public class PSGEditor extends JFrame {
 
                         }
                     }
-                };
-                out.start();
+                });
             }
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Exception: " + e.getClass() + " " + e.getMessage());
