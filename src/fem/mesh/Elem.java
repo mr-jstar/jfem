@@ -3,8 +3,6 @@
  */
 package fem.mesh;
 
-import fem.EleIntegral;
-
 /**
  *
  * @author jstar
