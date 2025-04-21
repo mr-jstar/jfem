@@ -539,7 +539,7 @@ public class SimpleGUI extends JFrame {
             }
         };
         thread.setDaemon(true);
-        thread.start();
+        SwingUtilities.invokeLater(thread);
         //double[] V = model.getFld();
         //double[] minmax = range(V);
         //System.out.println("V in <" + minmax[0] + "," + minmax[1] + ">");
