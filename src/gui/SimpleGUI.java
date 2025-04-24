@@ -83,8 +83,8 @@ public class SimpleGUI extends JFrame {
 
     private final JLabel message;  // Used to show status messages
 
-    private final double[] xrange = {Double.MAX_VALUE, -Double.MAX_VALUE};  // 2D mesh vertices coordinates x-range
-    private final double[] yrange = {Double.MAX_VALUE, -Double.MAX_VALUE};  // and y-range
+    private final double[] xrange = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY};  // 2D mesh vertices coordinates x-range
+    private final double[] yrange = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY};  // and y-range
 
     private final Map<Integer, Color> subDomColors = new HashMap<>(); // colors to show sub-domains
 
@@ -547,8 +547,8 @@ public class SimpleGUI extends JFrame {
 
     // Helper - get mesh vertices coordinates range
     private void computeMeshRange() {
-        xrange[0] = yrange[0] = Double.MAX_VALUE;
-        xrange[1] = yrange[1] = -Double.MAX_VALUE;
+        xrange[0] = yrange[0] = Double.POSITIVE_INFINITY;
+        xrange[1] = yrange[1] = Double.NEGATIVE_INFINITY;
         for (int v = 0; v < mesh.getNoVertices(); v++) {
             double[] x = mesh.getVertex(v).getX();
             if (x[0] < xrange[0]) {
