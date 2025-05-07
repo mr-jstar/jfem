@@ -71,13 +71,14 @@ public class SimpleGUI extends JFrame {
     private final JButton matsButton = new JButton("Edit materials");
     private final JButton computeButton = new JButton("Compute");
     private final JButton fieldButton = new JButton("Draw field");
+    private final JButton gradButton = new JButton("Draw field gradient");
     private final JButton clearButton = new JButton("Clear");
     private final JButton saveButton = new JButton("Save figure");
     private final JButton exitButton = new JButton("Close");
 
     private final JButton[] buttons = {
         loadButton, meshButton, bndButton, rmBndButton,
-        subDomButton, matsButton, computeButton, fieldButton,
+        subDomButton, matsButton, computeButton, fieldButton, gradButton,
         clearButton, saveButton, psgButton, exitButton
     };
 
@@ -112,6 +113,7 @@ public class SimpleGUI extends JFrame {
         matsButton.addActionListener(e -> subDomainsParameters());
         computeButton.addActionListener(e -> computeField());
         fieldButton.addActionListener(e -> drawField());
+        gradButton.addActionListener(e -> drawGradient());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
         exitButton.addActionListener(e -> System.exit(0));
 
@@ -608,6 +610,12 @@ public class SimpleGUI extends JFrame {
     // Action for Draw field button/menu item
     private void drawField() {
         options.put("showField", true);
+        drawingPanel.repaint();
+    }
+    
+    // Action for Draw field gradient button/menu item
+    private void drawGradient() {
+        options.put("showGrad", true);
         drawingPanel.repaint();
     }
 
