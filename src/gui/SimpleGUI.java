@@ -7,7 +7,9 @@ import fem.EleIntegral;
 import fem.FEM;
 import fem.TetraLaplace;
 import fem.TriangleLaplace;
+import fem.mesh.Elem;
 import fem.mesh.IMesh;
+import fem.mesh.StraightEdge;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -16,6 +18,7 @@ import java.io.*;
 import static java.lang.Thread.sleep;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -74,12 +77,13 @@ public class SimpleGUI extends JFrame {
     private final JButton gradButton = new JButton("Draw field gradient");
     private final JButton clearButton = new JButton("Clear");
     private final JButton saveButton = new JButton("Save figure");
+    private final JButton saveEdgesButton = new JButton("Save edges");
     private final JButton exitButton = new JButton("Close");
 
     private final JButton[] buttons = {
         loadButton, meshButton, bndButton, rmBndButton,
         subDomButton, matsButton, computeButton, fieldButton, gradButton,
-        clearButton, saveButton, psgButton, exitButton
+        clearButton, saveButton, saveEdgesButton, psgButton, exitButton
     };
 
     private final JLabel message;  // Used to show status messages
@@ -115,6 +119,7 @@ public class SimpleGUI extends JFrame {
         fieldButton.addActionListener(e -> drawField());
         gradButton.addActionListener(e -> drawGradient());
         saveButton.addActionListener(e -> drawingPanel.saveImage());
+        saveEdgesButton.addActionListener(e -> extractAndSaveEdges());
         exitButton.addActionListener(e -> System.exit(0));
 
         JPanel buttonPanel = new JPanel();
@@ -612,11 +617,39 @@ public class SimpleGUI extends JFrame {
         options.put("showField", true);
         drawingPanel.repaint();
     }
-    
+
     // Action for Draw field gradient button/menu item
     private void drawGradient() {
         options.put("showGrad", true);
         drawingPanel.repaint();
+    }
+
+    // Action for Extract And Save Edges button/meny
+    private void extractAndSaveEdges() {
+        JFileChooser fileChooser = new JFileChooser(getLastUsedDirectory());
+        setFontRecursively(fileChooser, currentFont, 0);
+        int result = fileChooser.showSaveDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            Set<StraightEdge> es = new HashSet<>();
+            for (int e = 0; e < mesh.getNoElems(); e++) {
+                int[] v = mesh.getElem(e).getVertices();
+                for (int i = 0; i < v.length; i++) {
+                    for (int j = i + 1; j < v.length; j++) {
+                        es.add(new StraightEdge(v[i], v[j]));
+                    }
+                }
+            }
+            try (PrintWriter p = new PrintWriter(fileChooser.getSelectedFile())) {
+                for (StraightEdge e : es) {
+                    int[] v = e.getVertices();
+                    p.println(e + " " + v[0] + " " + v[1] + " " + mesh.distance(v[0], v[1]));
+                }
+                p.flush();
+                JOptionPane.showMessageDialog(this, "Saved as: " + fileChooser.getSelectedFile().getAbsolutePath());
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+            }
+        }
     }
 
     // Helper - changes fonts of all components

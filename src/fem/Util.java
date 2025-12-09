@@ -191,7 +191,6 @@ public class Util {
             line = nextLine(r);
             String[] w = line.split("\\s+");
             int nVerts = Integer.parseInt(w[0]);
-            int dim = Integer.parseInt(w[1]);
             int nAttributes = Integer.parseInt(w[2]);
             int nMarkers = Integer.parseInt(w[3]);
             vl = new ArrayList<>(nVerts);

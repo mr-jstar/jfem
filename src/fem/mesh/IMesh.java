@@ -32,6 +32,17 @@ public interface IMesh {
         return getVertex(0).getDim();
     }
     
+    default double distance( int v1, int v2 ) {
+        if( v1 < 0 || v1 >= getNoVertices() || v2 < 0 || v2 >= getNoVertices() )
+            throw new IllegalArgumentException("IMesh: illegal vertex number");
+        double [] x1 = getVertex(v1).getX();
+        double [] x2 = getVertex(v2).getX();
+        double d = 0;
+        for( int i= 0; i < getDim(); i++ )
+            d += (x1[i]-x2[i])*(x1[i]-x2[i]);
+        return Math.sqrt(d);
+    }
+    
     default public int getNoSubdomains() {
         TreeSet<Integer> subdomains = new TreeSet<>();
         for( int e= 0; e < getNoElems(); e++ )

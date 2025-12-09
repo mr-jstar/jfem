@@ -54,6 +54,7 @@ public class Triangle implements Elem {
     public void setMarkers(int[] m) {
         this.markers = m;
     }
+    
     @Override
     public Iterator<Integer> iterator() {
         return new Iterator<Integer>() {
